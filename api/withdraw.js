@@ -1,20 +1,11 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { verifyInitData } from './_tg';
-
-if (!getApps().length && process.env.FIREBASE_SERVICE_ACCOUNT) {
-    initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
-    });
-}
-
-const db = getFirestore();
+import { db, rtdb, verifyInitData } from './_lib';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // ================= CẤU HÌNH =================
-const MIN_WITHDRAW = 2000000;         // Tối thiểu 50k xu
-const ADMIN_CHAT_ID = '8065435277'; // ID Admin nhận tin nhắn
+const MIN_WITHDRAW = 2000000;         // Tối thiểu 2 triệu xu
+const ADMIN_CHAT_ID = '8065435277';   // ID Admin nhận tin nhắn
 const LOGO_URL = 'https://i.imgur.com/RHlymWn.jpeg'; 
-const RATE = 0.001;                 // 1000 xu = 1 VND
+const RATE = 0.001;                   // 1000 xu = 1 VND
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -28,10 +19,10 @@ export default async function handler(req, res) {
 
     const uid = String(tgUser.id);
     
-    // 2. Nhận dữ liệu
+    // 2. Nhận dữ liệu từ Client
     const { amount, bank_code, account_number, account_name } = req.body;
 
-    // Validate
+    // Validate đầu vào
     if (!amount || amount < MIN_WITHDRAW) {
         return res.status(400).json({ error: 'Số tiền rút tối thiểu 2,000,000 xu' });
     }
@@ -39,64 +30,67 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Thiếu thông tin ngân hàng' });
     }
 
-    // Tính ra tiền VND thực nhận
     const realAmountVND = Math.floor(amount * RATE); 
     let sentMsgId = null;
 
-    try {
-        // 🔥 BƯỚC 1: CHECK SỐ DƯ
-        const userRef = db.collection('users').doc(uid);
-        const userSnap = await userRef.get();
-        if (!userSnap.exists) throw new Error('User not found');
-        
-        const userData = userSnap.data();
-        if ((userData.balance || 0) < amount) {
-            return res.status(400).json({ error: 'Số dư không đủ' });
-        }
+    const userRef = db.collection('users').doc(uid);
+    const walletRef = rtdb.ref(`user_wallets/${uid}`);
+    const socialRef = db.collection('user_social').doc(uid);
 
-        // 🔥 BƯỚC 2: GỬI LOGO TRƯỚC (Bỏ username ở đây)
+    try {
+        // 🔥 BƯỚC 1: GỬI LOGO "ĐANG XỬ LÝ" CHO ADMIN TRƯỚC (Để Admin biết có đơn)
         sentMsgId = await sendTelegramFirst(botToken, LOGO_URL, uid, realAmountVND);
         if (!sentMsgId) throw new Error("Lỗi kết nối Telegram");
 
-        // ✅ Dùng ID tin nhắn làm Mã giao dịch
-        const transCode = sentMsgId.toString(); 
+        const transCode = sentMsgId.toString(); // Mã giao dịch = ID tin nhắn
 
-        // 🔥 BƯỚC 3: TRỪ TIỀN & LƯU DB
-        await db.runTransaction(async (t) => {
-            const doc = await t.get(userRef);
-            if ((doc.data().balance || 0) < amount) throw new Error("NOT_ENOUGH_BALANCE");
-
-            // Trừ tiền
-            t.update(userRef, { balance: FieldValue.increment(-amount) });
-
-            // Lưu lịch sử
-            const historyRef = db.collection('user_social').doc(uid);
-            t.set(historyRef, {
-                withdrawHistory: FieldValue.arrayUnion({
-                    id: transCode,
-                    amount: realAmountVND,
-                    method: bank_code,
-                    address: `${account_number} - ${account_name}`,
-                    status: 'pending',
-                    created_at: Date.now()
-                })
-            }, { merge: true });
+        // 🔥 BƯỚC 2: TRỪ TIỀN BÊN REALTIME DB (Nhanh gọn)
+        await walletRef.transaction((data) => {
+            if (data) {
+                if ((data.balance || 0) < amount) {
+                    throw new Error('NOT_ENOUGH_BALANCE');
+                }
+                data.balance -= amount;
+            }
+            return data;
         });
 
-        // 🔥 BƯỚC 4: BIẾN HÌNH THÀNH QR CODE
+        // 🔥 BƯỚC 3: LƯU STK & LỊCH SỬ BÊN FIRESTORE
+        // A. Cập nhật thông tin Bank mới nhất vào Profile (để lần sau tự điền)
+        await userRef.update({
+            bank_info: {
+                bank_code,
+                account_number,
+                account_name: account_name.toUpperCase()
+            }
+        });
+
+        // B. Lưu lịch sử rút tiền
+        await socialRef.update({
+            withdrawHistory: FieldValue.arrayUnion({
+                id: transCode,
+                amount: realAmountVND,
+                amountGold: amount,
+                method: bank_code,
+                address: `${account_number} - ${account_name}`,
+                status: 'pending',
+                created_at: Date.now()
+            })
+        });
+
+        // 🔥 BƯỚC 4: BIẾN TIN NHẮN ADMIN THÀNH QR CODE
         const contentCK = `${uid} SEVQR TyPhuBauTroi ${transCode}`; 
         const safeName = String(account_name).replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
         // Link VietQR
         const qrUrl = `https://img.vietqr.io/image/${bank_code}-${account_number}-compact.png?amount=${realAmountVND}&addInfo=${encodeURIComponent(contentCK)}&accountName=${encodeURIComponent(safeName)}`;
 
-        // ✅ Gọi hàm KHÔNG CÓ username
         await editTelegramMedia(
             botToken, 
             sentMsgId, 
             qrUrl, 
             uid, 
-            realAmountVND, // Tham số này sẽ khớp vào vị trí amountVND
+            realAmountVND, 
             bank_code, 
             account_number, 
             safeName, 
@@ -109,7 +103,7 @@ export default async function handler(req, res) {
     } catch (e) {
         console.error("Withdraw Error:", e);
 
-        // 🔥 BƯỚC 5: NẾU LỖI -> XÓA TIN NHẮN
+        // NẾU LỖI -> XÓA TIN NHẮN ADMIN ĐỂ KHÔNG BỊ RÁC
         if (sentMsgId) {
             await deleteTelegramMsg(botToken, sentMsgId);
         }
@@ -121,7 +115,7 @@ export default async function handler(req, res) {
 
 // ================= HELPER FUNCTIONS =================
 
-// 1. Gửi Logo Loading (Đã bỏ tham số thừa)
+// 1. Gửi tin nhắn chờ
 async function sendTelegramFirst(token, photoUrl, uid, amountVND) {
     try {
         const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
@@ -142,7 +136,7 @@ async function sendTelegramFirst(token, photoUrl, uid, amountVND) {
     } catch (e) { return null; }
 }
 
-// 2. Edit thành QR (Đã xóa tham số username khỏi định nghĩa hàm)
+// 2. Sửa thành QR Code
 async function editTelegramMedia(token, msgId, qrUrl, uid, amountVND, bank, accNum, name, content, code) {
     try {
         const caption = `💸 <b>YÊU CẦU RÚT TIỀN: #${code}</b>\n` + 
@@ -173,7 +167,7 @@ async function editTelegramMedia(token, msgId, qrUrl, uid, amountVND, bank, accN
     } catch (e) { console.error("Edit Media Error:", e); }
 }
 
-// 3. Xóa tin nhắn
+// 3. Xóa tin nhắn (khi lỗi)
 async function deleteTelegramMsg(token, msgId) {
     try {
         await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
