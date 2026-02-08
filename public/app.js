@@ -2154,11 +2154,10 @@ async function switchTab(tabName) {
     const miniBal = document.getElementById('mini-balance');
     const miniDia = document.getElementById('mini-diamond');
 
-    // ✅ 💎 LUÔN HIỆN
+    // HIỆN/ẨN SỐ DƯ TRÊN HEADER
     miniDia.classList.remove('hidden');
     miniDia.classList.add('flex');
 
-    // ✅ 💰 CHỈ ẨN Ở TAB BAY
     if (tabName === 'exchange') {
         miniBal.classList.add('hidden');
         miniBal.classList.remove('flex');
@@ -2168,104 +2167,113 @@ async function switchTab(tabName) {
     }
     
     // ============================================================
-    // 🔥 LOGIC GỌI API: CHỈ GỌI USER KHI VÀO TAB BAY
+    // 🔥 LOGIC MỚI: DÙNG SYNC.JS ĐỂ CẬP NHẬT NHANH
     // ============================================================
     
     if (tabName === 'exchange') {
-        loadUserInfo({ silent: true }); // Sync lại tiền/năng lượng cho chắc
+        // Chỉ gọi sync nhẹ để lấy lại số dư/năng lượng mới nhất
+        syncGameData(); 
     }
 
     // ============================================================
-    // RENDERING (Dữ liệu đã có sẵn trong state từ lúc initApp)
+    // RENDERING (Dữ liệu đã có sẵn trong state từ loadUserInfo)
     // ============================================================
     
-    if (tabName === 'mine') {
-        renderInvestments();
-    }
-    
-    if (tabName === 'quests') { 
-        renderTasks(); 
-        renderDaily(); 
-    }
-    
-    if (tabName === 'friends') {
-        renderFriends();
-    }
-
+    if (tabName === 'mine') renderInvestments();
+    if (tabName === 'quests') { renderTasks(); renderDaily(); }
+    if (tabName === 'friends') renderFriends();
     if (tabName === 'withdraw') {
         renderWithdrawHistory();
         applyBankInfoToWithdrawForm();
     }
 }
 
-// Hàm Load User Info
+// 🔥 HÀM MỚI: ĐỒNG BỘ NHANH (GỌI API/SYNC)
+// Dùng khi chuyển tab hoặc sau khi thực hiện hành động nhỏ
+async function syncGameData() {
+    try {
+        const res = await fetch(`${API_BASE}/sync`, { // Bạn cần tạo file api/sync.js tương ứng
+            method: 'POST',
+            headers: getHeaders()
+        });
+        
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Chỉ cập nhật các thông số biến động
+        state.balance = data.balance ?? state.balance;
+        state.diamond = data.diamond ?? state.diamond;
+        state.energy = data.energy ?? state.energy;
+        
+        // Nếu sync trả về cả maxEnergy (do nâng cấp ở thiết bị khác) thì update luôn
+        if (data.baseMaxEnergy) state.baseMaxEnergy = data.baseMaxEnergy;
+
+        updateUI();
+    } catch (e) {
+        console.warn("Sync error:", e);
+    }
+}
+
+// 🔥 HÀM LOAD FULL DATA (GỌI API/USER - CHỈ 1 LẦN)
 async function loadUserInfo({ silent = false } = {}) {
     try {
         const res = await fetch(`${API_BASE}/user`, {
             method: 'POST',
             headers: getHeaders()
         });
-        if (res.status === 401) {
-            throw new Error('SESSION_EXPIRED');
-        }
+
+        if (res.status === 401) throw new Error('SESSION_EXPIRED');
         if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.error || 'Unauthorized');
+            throw new Error(err.error || 'Lỗi tải dữ liệu');
         }
 
         const data = await res.json();
         const prevBalance = state.balance;
 
-        // ===== CẬP NHẬT STATE TỪ SERVER (CORE DATA) =====
+        // ============================================================
+        // MAP TOÀN BỘ DỮ LIỆU TỪ API USER VÀO STATE
+        // ============================================================
+        
+        // 1. Core & Wallet
         state.balance = data.balance ?? 0;
         state.diamond = data.diamond ?? 0;
+        state.energy = data.energy ?? 0;
+        state.baseMaxEnergy = data.baseMaxEnergy ?? 1000;
         state.level = data.level ?? 1;
         state.exp = data.exp ?? 0;
 
-        state.energy = data.energy ?? 0;
-        state.baseMaxEnergy = data.baseMaxEnergy ?? 1000;
-
+        // 2. Upgrades & Game Params
         state.tapValue = data.tapValue ?? 1;
         state.multitapLevel = data.multitapLevel ?? 1;
         state.energyLimitLevel = data.energyLimitLevel ?? 1;
-
-        // Data Đầu tư
         state.investments = data.investments ?? {};
-        state.bank_info = data.bank_info ?? null;
 
+        // 3. Social & History (Bây giờ nằm chung trong User API)
+        state.inviteCount = data.inviteCount ?? 0;
+        state.totalInviteDiamond = data.totalInviteDiamond ?? 0;
+        state.completedTasks = data.completedTasks ?? [];
+        state.withdrawHistory = data.withdrawHistory ?? [];
+        
+        // Lưu ý: api/user.js của bạn trả về `savedBankInfo` để map vào UI
+        state.bank_info = data.savedBankInfo || data.bank_info || null; 
 
-        // Data Hồi năng lượng (Nếu API trả về - tùy logic server)
-        // Nếu server bạn chưa trả về 2 dòng này ở api/user thì có thể bỏ qua
-        // Nhưng tốt nhất nên giữ để đồng bộ visual
-        if (data.nextRefillAt !== undefined) {
-            state.nextRefillAt = data.nextRefillAt;
-        }
+        // 4. Daily Checkin
+        state.dailyStreak = data.dailyStreak ?? 0;
+        state.isClaimedToday = data.isClaimedToday ?? false;
 
-        // Sync giờ server (Chống hack giờ)
-        if (data.server_time) {
-            serverTimeOffset = data.server_time - Date.now();
-        }
-
+        // 5. System
+        if (data.server_time) serverTimeOffset = data.server_time - Date.now();
         lastUserSyncAt = Date.now();
 
-        // ❌ KHÔNG load tasks, friends, history ở đây nữa
-        // Các mục đó đã chuyển sang switchTab
-
-        // 👉 Animation số tiền
+        // 👉 Animation số tiền (nếu không silent)
         if (!silent && state.balance > prevBalance) {
             animateBalance(state.balance);
         } else {
             currentDisplayBalance = state.balance;
             const formatted = formatNumber(state.balance);
-            
-            const balDisplay = document.getElementById('balance-display');
-            if(balDisplay) balDisplay.innerText = formatted;
-            
-            const miniBal = document.getElementById('mini-balance-text');
-            if(miniBal) miniBal.innerText = formatted;
-            
-            const withdrawBal = document.getElementById('withdraw-balance');
-            if(withdrawBal) withdrawBal.innerText = formatted;
+            if(document.getElementById('balance-display')) 
+                document.getElementById('balance-display').innerText = formatted;
         }
 
         updateUI();
@@ -2274,40 +2282,17 @@ async function loadUserInfo({ silent = false } = {}) {
 
     } catch (e) {
         if (e.message === 'SESSION_EXPIRED') {
-            tg.showAlert(
-                '⏳ Phiên đăng nhập đã hết hạn.\nVui lòng mở lại Mini App để tiếp tục.'
-            );
-
-            setTimeout(() => {
-                tg.close(); // hoặc location.reload()
-            }, 15000);
+            tg.showAlert('⏳ Phiên đăng nhập hết hạn. Vui lòng mở lại.');
+            setTimeout(() => tg.close(), 5000);
         }
-        console.error("LOGIN FAILED:", e);
+        console.error("LOAD FULL INFO FAILED:", e);
+        throw e; // Ném lỗi để initApp bắt được và không tắt loading
     }
 }
 
-// Hàm tải dữ liệu phụ (Social, History) chạy song song với UserInfo
-async function loadAuxData() {
-    try {
-        const socialRes = await fetch(`${API_BASE}/social`, { headers: getHeaders() });
-        if (socialRes.ok) {
-            const socialData = await socialRes.json();
-            
-            state.completedTasks = socialData.completedTasks || [];
-            
-            // 🔥 SỬA: Lấy thẳng số lượng (API trả về inviteCount)
-            state.inviteCount = socialData.inviteCount || 0;
-            state.totalInviteDiamond = socialData.totalInviteDiamond || 0; 
-            
-            state.dailyStreak = socialData.dailyStreak ?? 0;
-            state.isClaimedToday = socialData.isClaimedToday ?? false;
-            state.withdrawHistory = socialData.history || [];
-        }
-    } catch (e) { console.error("Lỗi tải dữ liệu phụ:", e); }
-}
+// ❌ BỎ HÀM loadAuxData() VÌ KHÔNG CÒN DÙNG NỮA
 
-// Khởi tạo App
-// Khởi tạo App
+// Khởi tạo App (Entry Point)
 async function initApp() {
     try {
         const user = tg.initDataUnsafe?.user;
@@ -2315,19 +2300,14 @@ async function initApp() {
             currentUserUID = user.id;
             let displayName = user.first_name || 'Phi công';
             if (user.last_name) displayName += ' ' + user.last_name;
-            
-            // Cập nhật tên nếu có element (phòng hờ)
             const nameEl = document.getElementById('username');
             if (nameEl) nameEl.innerText = displayName;
         }
 
-        // 🔥 QUAN TRỌNG: await ở đây nghĩa là "Chờ xong xuôi mới đi tiếp"
-        await Promise.all([
-            loadUserInfo(), // Gọi API user
-            loadAuxData()   // Gọi API social
-        ]);
+        // 🔥 CHỈ GỌI 1 API DUY NHẤT ĐỂ LẤY FULL DATA
+        await loadUserInfo(); 
 
-        // Render tab bạn bè sau khi có data
+        // Render tab bạn bè ngay lập tức vì data đã có trong loadUserInfo
         renderFriends();
 
     } catch (e) {
@@ -2335,13 +2315,11 @@ async function initApp() {
         tg.showAlert("⚠️ Lỗi kết nối máy chủ. Vui lòng thử lại!");
     } finally {
         // ============================================================
-        // 🟢 KHI API ĐÃ TRẢ VỀ (XONG HOẶC LỖI) THÌ CHẠY VÀO ĐÂY
+        // 🟢 KHI LOAD XONG THÌ MỚI TẮT MÀN HÌNH LOADING
         // ============================================================
-        
-        // 1. Dừng cái vòng lặp giả lập % bên HTML
         if (window.stopLoadingSim) window.stopLoadingSim();
 
-        // 2. Kéo thanh loading lên 100% cho người dùng sướng mắt
+        // Kéo thanh loading lên 100%
         const bar = document.getElementById('loading-progress');
         const pct = document.getElementById('loading-percent');
         const txt = document.getElementById('loading-text');
@@ -2350,23 +2328,23 @@ async function initApp() {
         if (pct) pct.innerText = '100%';
         if (txt) txt.innerText = 'Sẵn sàng cất cánh!';
 
-        // 3. Đợi 300ms cho user nhìn thấy 100% rồi mới ẩn màn hình
+        // Ẩn màn hình loading
         const loader = document.getElementById('loading-screen');
         if (loader) {
             setTimeout(() => {
-                loader.style.opacity = '0';     // Làm mờ
-                setTimeout(() => loader.remove(), 500); // Xóa khỏi DOM
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
             }, 300);
         }
     }
 }
 
 window.onload = () => {
-    renderGameScene('IDLE'); // Chỉ render UI nền
+    renderGameScene('IDLE');
     lucide.createIcons();
     calcAngle();
 
-    // 🔥 LOGIN + SYNC USER
+    // 🔥 BẮT ĐẦU QUÁ TRÌNH KHỞI TẠO
     initApp();
 };
 
