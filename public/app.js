@@ -1995,14 +1995,19 @@ function renderBoosts(force = false) {
 
 window.toggleBoostPanel = (key) => {
     if (openedBoostPanel === key) {
+        // Bấm lại chính nó → đóng
         openedBoostPanel = null;
         isEditingBoostInput = false;
     } else {
+        // Mở panel mới → đóng cái cũ
         openedBoostPanel = key;
         isEditingBoostInput = false;
     }
+
+    // 🔥 BẮT BUỘC render lại có force
     renderBoosts(true);
 };
+
 
 window.updateBuyEnergyPreview = () => {
     const input = document.getElementById('buy-energy-input');
@@ -2010,42 +2015,73 @@ window.updateBuyEnergyPreview = () => {
     if (!input || !btn) return;
 
     const ENERGY_PER_DIAMOND = 50;
-    const want = parseInt(input.value);
+    const want = parseInt(input.value, 10);
 
+    // ❌ Không nhập / nhập linh tinh
     if (!want || want <= 0) {
         btn.innerText = '💎 0';
         btn.disabled = true;
         return;
     }
 
-    const max = state.baseMaxEnergy - state.energy;
-    const energy = Math.min(want, max);
-    const diamonds = Math.ceil(energy / ENERGY_PER_DIAMOND);
-
-    if (diamonds > state.diamond) {
-        btn.innerText = 'Thiếu 💎';
+    // ❌ Đã full năng lượng
+    const canFill = state.baseMaxEnergy - state.energy;
+    if (canFill <= 0) {
+        btn.innerText = 'Đã đầy';
         btn.disabled = true;
         return;
     }
 
-    btn.innerText = `Mua (${diamonds} 💎)`;
+    // ✅ Giới hạn năng lượng được mua
+    const energyToBuy = Math.min(want, canFill);
+    const diamondsNeed = Math.ceil(energyToBuy / ENERGY_PER_DIAMOND);
+
+    // ❌ Không đủ kim cương
+    if (diamondsNeed > state.diamond) {
+        btn.innerText = `Thiếu 💎`;
+        btn.disabled = true;
+        return;
+    }
+
+    // ✅ OK
+    btn.innerText = `Mua (${diamondsNeed} 💎)`;
     btn.disabled = false;
 };
 
+
 window.confirmBuyEnergy = (btn) => {
-    btn.dataset.energy = document.getElementById('buy-energy-input').value;
+    const input = document.getElementById('buy-energy-input');
+    if (!input) return;
+
+    const want = parseInt(input.value, 10);
+    if (!want || want <= 0) return;
+
+    // Gắn data cho server dùng
+    btn.dataset.amount = want;
+
+    // 🔒 Đóng panel ngay để tránh double render
+    openedBoostPanel = null;
+    isEditingBoostInput = false;
+
     applyBoost('buy_energy', btn);
 };
+
 
 window.updateGoldToDiamondPreview = () => {
     const input = document.getElementById('gold-to-diamond-input');
     const btn = document.getElementById('gold-to-diamond-confirm');
     if (!input || !btn) return;
 
-    const gold = parseInt(input.value);
+    const gold = parseInt(input.value, 10);
 
-    if (!gold || gold <= 0 || gold > state.balance) {
-        btn.innerText = 'Không đủ 💰';
+    if (!gold || gold <= 0) {
+        btn.innerText = 'Đổi';
+        btn.disabled = true;
+        return;
+    }
+
+    if (gold > state.balance) {
+        btn.innerText = 'Thiếu 💰';
         btn.disabled = true;
         return;
     }
@@ -2054,10 +2090,22 @@ window.updateGoldToDiamondPreview = () => {
     btn.disabled = false;
 };
 
+
 window.confirmGoldToDiamond = (btn) => {
-    btn.dataset.gold = document.getElementById('gold-to-diamond-input').value;
+    const input = document.getElementById('gold-to-diamond-input');
+    if (!input) return;
+
+    const gold = parseInt(input.value, 10);
+    if (!gold || gold <= 0) return;
+
+    btn.dataset.amount = gold;
+
+    openedBoostPanel = null;
+    isEditingBoostInput = false;
+
     applyBoost('gold_to_diamond', btn);
 };
+
 
 window.applyBoost = async (type, btn) => {
     // 1. Chặn click đúp
