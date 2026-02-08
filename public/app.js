@@ -1684,27 +1684,68 @@ window.claimDaily = async (idx, btn) => {
 
 function renderFriends() {
     const container = document.getElementById('friend-list-container');
-    if(!container) return;
-    if (state.friendsList.length === 0) {
-        container.innerHTML = '<div class="text-center text-gray-500 text-xs py-10 bg-[#1c1c1e] rounded-xl border border-white/5">Bạn chưa mời được ai</div>';
-    } else {
-         container.innerHTML = ''; 
-         state.friendsList.forEach(friend => {
-             container.innerHTML += `
-                <div class="bg-[#1c1c1e] p-3 rounded-xl border border-white/5 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-white">${friend.name.charAt(0)}</div>
-                        <div>
-                            <div class="text-sm font-bold text-white">${friend.name}</div>
-                            <div class="text-[10px] text-gray-500">${friend.type}</div>
-                        </div>
-                    </div>
-                    <div class="text-xs font-bold text-yellow-400">+${formatNumber(friend.reward)}</div>
+    if (!container) return;
+
+    const inviteCount = state.friendsList.length;
+    const inviteEarn  = state.inviteEarn || 0;
+
+    const inviteLink =
+        `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
+
+    const qrUrl =
+        `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}`;
+
+    container.innerHTML = `
+        <!-- STATS -->
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+                <div class="text-xs text-gray-400 mb-1">Lượt mời</div>
+                <div class="text-2xl font-black text-white">${inviteCount}</div>
+            </div>
+
+            <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+                <div class="text-xs text-gray-400 mb-1">Tổng thu</div>
+                <div class="text-2xl font-black text-green-400">
+                    ${formatNumber(inviteEarn)}
                 </div>
-             `;
-         });
-    }
+            </div>
+        </div>
+
+        <!-- QR -->
+        <div class="bg-[#2d2d3e]/90 rounded-2xl p-5 border border-[#3d3d52] mb-5 text-center">
+            <div class="text-sm font-bold text-white mb-3">
+                Quét mã để tham gia
+            </div>
+            <div class="bg-white p-3 rounded-xl inline-block">
+                <img src="${qrUrl}" class="w-44 h-44" />
+            </div>
+        </div>
+
+        <!-- LINK -->
+        <div class="bg-[#1c1c2e] rounded-xl p-3 border border-white/10 flex items-center gap-2 mb-4">
+            <input
+                readonly
+                value="${inviteLink}"
+                class="flex-1 bg-transparent text-xs text-gray-300 outline-none"
+            />
+            <button
+                onclick="copyInviteLink()"
+                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500
+                       text-white text-xs font-bold active:scale-95 transition">
+                COPY
+            </button>
+        </div>
+
+        <!-- NOTE -->
+        <div class="bg-[#2d2d3e]/80 rounded-xl p-4 border border-[#3d3d52]
+                    text-sm text-gray-300 space-y-2">
+            <div>• Chia sẻ link hoặc mã QR cho bạn bè.</div>
+            <div>• Thành viên tham gia sẽ được ghi nhận vào đội.</div>
+            <div>• Thưởng được cộng trực tiếp vào tài khoản.</div>
+        </div>
+    `;
 }
+
 
 window.copyInviteLink = () => {
     const link = `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
