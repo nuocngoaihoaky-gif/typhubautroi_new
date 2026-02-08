@@ -1,165 +1,190 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getDatabase } from 'firebase-admin/database'; // 👈 Import RTDB
 import { verifyInitData } from './_tg';
 
-// =================================================
-// 🔧 FIREBASE INIT
-// =================================================
+// 1. KẾT NỐI FIREBASE (Thêm databaseURL)
 if (!getApps().length && process.env.FIREBASE_SERVICE_ACCOUNT) {
     initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
+        credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+        // 👇 QUAN TRỌNG: Trỏ đúng vào server Singapore
+        databaseURL: "https://typhubaytroi-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
 }
 
 const db = getFirestore();
+const rtdb = getDatabase(); // 👈 Khởi tạo Realtime DB
 
-// =================================================
-// ⚙️ CONFIG
-// =================================================
-const DEFAULT_REF_UID = '8065435277';
-const REGEN_RATE = 3;               // Năng lượng / giây
-const SECRET_PREFIX = '26032007';   // 🔒 Mã đánh dấu user chưa active
+// Cấu hình game
+const DEFAULT_REF_UID = '8065435277'; // UID Admin mặc định
+const REF_PREFIX = '000000';          // Tiền tố mã mời
+const REGEN_RATE = 3;                 // Tốc độ hồi năng lượng: 3 điểm/giây
 
-// =================================================
-// 🚀 MAIN HANDLER
-// =================================================
 export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+    // 2. XÁC THỰC
     const initData = req.headers['x-init-data'];
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgUser = verifyInitData(initData, botToken);
 
-    if (!tgUser) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const uid = String(tgUser.id);
     const userRef = db.collection('users').doc(uid);
+    const walletRef = rtdb.ref(`user_wallets/${uid}`); // 👈 Trỏ vào ví RTDB
 
     try {
-        const snap = await userRef.get();
+        // 🔥 CHẠY SONG SONG: Lấy Profile (Firestore) và Ví (RTDB) cùng lúc
+        const [userSnap, walletSnap] = await Promise.all([
+            userRef.get(),
+            walletRef.once('value')
+        ]);
+
         const now = Date.now();
+        let firestoreData = userSnap.exists ? userSnap.data() : null;
+        let walletData = walletSnap.val();
 
-        // =================================================
-        // 1️⃣ USER CŨ (LOGIN) - Giữ nguyên
-        // =================================================
-        if (snap.exists) {
-            const data = snap.data();
-
-            // ===== ENERGY REGEN THEO THỜI GIAN =====
-            const lastUpdate = data.last_energy_update || now;
-            const maxEnergy = data.baseMaxEnergy || 1000;
-            let currentEnergy = data.energy || 0;
-
-            const elapsed = Math.floor((now - lastUpdate) / 1000);
-            if (elapsed > 0 && currentEnergy < maxEnergy) {
-                currentEnergy = Math.min(
-                    currentEnergy + elapsed * REGEN_RATE,
-                    maxEnergy
-                );
+        // =========================================================
+        // TRƯỜNG HỢP 1: USER CŨ (ĐÃ CÓ TÀI KHOẢN)
+        // =========================================================
+        if (firestoreData) {
+            // 🛠 TỰ ĐỘNG MIGRATION: 
+            // Nếu user có bên Firestore nhưng chưa có ví bên RTDB (do mới chuyển nhà)
+            // -> Tạo ví mới ngay lập tức
+            if (!walletData) {
+                walletData = {
+                    balance: firestoreData.balance || 0, // Lấy số dư cũ sang
+                    diamond: 0,
+                    energy: 1000,
+                    baseMaxEnergy: 1000, 
+                    last_energy_update: now
+                };
+                await walletRef.set(walletData);
             }
 
-            const nextRefillAt = data.next_refill_at || 0;
+            // --- TÍNH TOÁN NĂNG LƯỢNG HỒI (OFFLINE) ---
+            const lastUpdate = walletData.last_energy_update || now;
+            const maxEnergy = walletData.baseMaxEnergy || 1000;
+            let currentEnergy = walletData.energy || 0;
+            const elapsed = Math.floor((now - lastUpdate) / 1000);
+
+            // Chỉ tính để hiển thị, client tự chạy tiếp. Server không cần ghi lại liên tục.
+            if (elapsed > 0 && currentEnergy < maxEnergy) {
+                currentEnergy = Math.min(currentEnergy + elapsed * REGEN_RATE, maxEnergy);
+            }
+
+            // --- LẤY THÔNG TIN NGÂN HÀNG (để auto-fill form rút tiền) ---
+            const bankInfo = firestoreData.bank_info || null;
 
             return res.status(200).json({
                 id: uid,
-                username: data.username,
-                balance: data.balance || 0,
-                total_earned: data.total_earned || 0,
+                username: firestoreData.username || tgUser.first_name,
+                
+                // 👇 Lấy từ Realtime DB (Realtime)
+                balance: walletData.balance || 0,
+                diamond: walletData.diamond || 0,
                 energy: currentEnergy,
                 baseMaxEnergy: maxEnergy,
-                last_energy_update: lastUpdate,
-                level: data.level || 1,
-                exp: data.exp || 0,
-                multitapLevel: data.multitapLevel || 1,
-                tapValue: data.tapValue || 1,
-                energyLimitLevel: data.energyLimitLevel || 1,
-                investments: data.investments || {},
-                nextRefillAt: nextRefillAt,
+                
+                // 👇 Lấy từ Firestore (Tĩnh)
+                level: firestoreData.level || 1,
+                exp: firestoreData.exp || 0,
+                multitapLevel: firestoreData.multitapLevel || 1,
+                energyLimitLevel: firestoreData.energyLimitLevel || 1,
+                investments: firestoreData.investments || {},
+                bank_info: bankInfo, // Trả về STK cũ
+                
+                // Đồng bộ thời gian
+                nextRefillAt: walletData.nextRefillAt || 0,
                 server_time: now
             });
         }
 
-        // =================================================
-        // 2️⃣ USER MỚI (CREATE)
-        // =================================================
+        // =========================================================
+        // TRƯỜNG HỢP 2: USER MỚI TINH (TẠO ACC)
+        // =========================================================
+        
+        // 1. Xử lý Mã mời (Ref)
         const params = new URLSearchParams(initData);
         let refUid = params.get('start_param');
-
-        // Validate Ref ID cơ bản
+        
+        // Validate ID người mời
         if (!refUid || refUid === uid || isNaN(Number(refUid))) {
             refUid = DEFAULT_REF_UID;
         }
-
-        // Kiểm tra xem người mời có tồn tại không
-        let finalRefBy = DEFAULT_REF_UID; // Mặc định là admin
-
+        
+        let finalRefBy = DEFAULT_REF_UID;
+        
+        // Check xem người mời có tồn tại không (Chỉ cần check Firestore cho nhanh)
         if (refUid !== DEFAULT_REF_UID) {
-            const refSnap = await db.collection('user_social').doc(refUid).get();
-            if (refSnap.exists) {
-                // ✅ Nếu người mời hợp lệ -> Gắn thêm mã 26032007 vào đầu
-                // Ví dụ: refUid là "12345" -> Lưu thành "2603200712345"
-                finalRefBy = SECRET_PREFIX + refUid;
+            const refUser = await db.collection('users').doc(refUid).get();
+            if (refUser.exists) {
+                // ✅ Lưu đúng định dạng bạn yêu cầu: 000000 + UID
+                finalRefBy = REF_PREFIX + refUid;
             } else {
                 finalRefBy = DEFAULT_REF_UID;
             }
         } else {
-            // Nếu là ref admin mặc định thì giữ nguyên, không cần gắn mã (hoặc gắn tùy bạn)
-            finalRefBy = DEFAULT_REF_UID; 
+            // Nếu là admin hoặc không có mã mời -> Vẫn lưu admin nhưng không cần prefix 000000 (hoặc tùy bạn)
+            // Ở đây mình để mặc định là ID admin trần
+            finalRefBy = DEFAULT_REF_UID;
         }
 
         const batch = db.batch();
 
-        // ===== USERS CORE =====
-        const newCoreData = {
+        // 2. Tạo Profile bên Firestore (Dữ liệu tĩnh)
+        const newFirestoreData = {
             id: uid,
             telegram_id: Number(uid),
-            balance: 500000, // Quà tân thủ
-            total_earned: 0,
+            username: tgUser.username || tgUser.first_name || `Phi công ${uid.slice(-4)}`,
             level: 1,
             exp: 0,
-            energy: 1000,
-            baseMaxEnergy: 1000,
-            last_energy_update: now,
             multitapLevel: 1,
             tapValue: 1,
             energyLimitLevel: 1,
             investments: {},
-            next_refill_at: 0
+            bank_info: null, // Chưa có thông tin ngân hàng
+            created_at: FieldValue.serverTimestamp()
         };
+        batch.set(userRef, newFirestoreData);
 
-        batch.set(userRef, newCoreData);
-
-        // ===== USER SOCIAL =====
+        // 3. Tạo Social Info bên Firestore
         const socialRef = db.collection('user_social').doc(uid);
-        
         batch.set(socialRef, {
-            // 🔥 Lưu ref_by kèm mã bí mật (VD: 26032007123456)
+            // 🔥 Chỉ lưu mã người giới thiệu, KHÔNG cộng thưởng ngay
             ref_by: finalRefBy,
-            
-            // ❌ Đã bỏ cờ ref_status
-            
-            created_at: FieldValue.serverTimestamp(),
-            username: tgUser.username || tgUser.first_name || `Phi công ${uid.slice(-4)}`,
             invite_count: 0,
-            friends: [],
+            total_invite_earned: 0,
             completed_tasks: [],
-            withdrawHistory: []
+            withdrawHistory: [],
+            daily_streak: 0,
+            last_daily_date: null
         });
 
+        // 4. Tạo Ví bên Realtime DB (QUAN TRỌNG - Dữ liệu động)
+        const newWalletData = {
+            balance: 0,
+            diamond: 50000, // Quà tân thủ
+            energy: 1000,
+            baseMaxEnergy: 1000,
+            last_energy_update: now,
+            nextRefillAt: 0
+        };
+        // Lưu ý: RTDB dùng set() riêng, không nhét vào batch Firestore được
+        await walletRef.set(newWalletData); 
+
+        // 5. Chốt đơn Firestore
         await batch.commit();
 
         return res.status(200).json({
-            ...newCoreData,
-            created_at: new Date().toISOString(),
+            ...newFirestoreData,
+            ...newWalletData, // Gộp ví vào kết quả trả về
             server_time: now
         });
 
     } catch (e) {
         console.error('User API Error:', e);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ error: 'Lỗi đăng nhập' });
     }
 }
