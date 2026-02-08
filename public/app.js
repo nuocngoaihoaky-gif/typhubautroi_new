@@ -482,7 +482,10 @@ function updateUI() {
     document.getElementById('mine-pending-return').innerText = `+${formatNumber(pending)}`;
     document.getElementById('friend-count').innerText = state.friendsList.length;
 
-    renderBoosts();
+    if (!isEditingBoostInput) {
+        renderBoosts();
+    }
+
     renderTasks();
     renderFriends();
     renderWithdrawHistory();
@@ -1853,11 +1856,14 @@ document.getElementById('withdraw-amount').addEventListener('input', (e) => {
 });
 
 function renderBoosts(force = false) {
+    // ⛔ ĐANG NHẬP → KHÔNG RENDER LẠI
+    if (isEditingBoostInput && !force) return;
+
     const container = document.getElementById('boost-list');
     if (!container) return;
 
     const multitapCost = 5000 * Math.pow(2, state.multitapLevel - 1);
-    const energyCost = 5000 * Math.pow(2, state.energyLimitLevel - 1);
+    const energyCost   = 5000 * Math.pow(2, state.energyLimitLevel - 1);
 
     const btnStyle =
         "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all";
@@ -1895,9 +1901,13 @@ function renderBoosts(force = false) {
         'blue',
         `Turbo Lv.${state.multitapLevel}`,
         `+${state.tapValue} chuyển đổi`,
-        `<button onclick="applyBoost('multitap', this)"
-            ${state.balance < multitapCost ? 'disabled' : ''}
-            class="${state.balance >= multitapCost ? btnStyle : btnDisabled}">
+        `<button onclick="
+            openedBoostPanel = null;
+            isEditingBoostInput = false;
+            applyBoost('multitap', this)
+        "
+        ${state.balance < multitapCost ? 'disabled' : ''}
+        class="${state.balance >= multitapCost ? btnStyle : btnDisabled}">
             ${formatNumber(multitapCost)} 💰
         </button>`
     );
@@ -1908,9 +1918,13 @@ function renderBoosts(force = false) {
         'purple',
         `Bình xăng Lv.${state.energyLimitLevel}`,
         `Max ${formatNumber(state.baseMaxEnergy)} năng lượng`,
-        `<button onclick="applyBoost('limit', this)"
-            ${state.balance < energyCost ? 'disabled' : ''}
-            class="${state.balance >= energyCost ? btnStyle : btnDisabled}">
+        `<button onclick="
+            openedBoostPanel = null;
+            isEditingBoostInput = false;
+            applyBoost('limit', this)
+        "
+        ${state.balance < energyCost ? 'disabled' : ''}
+        class="${state.balance >= energyCost ? btnStyle : btnDisabled}">
             ${formatNumber(energyCost)} 💰
         </button>`
     );
@@ -1931,6 +1945,8 @@ function renderBoosts(force = false) {
             min="1"
             placeholder="Nhập số năng lượng"
             class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
+            onfocus="isEditingBoostInput = true"
+            onblur="isEditingBoostInput = false"
             oninput="updateBuyEnergyPreview()"
         />
         <button id="buy-energy-confirm"
@@ -1959,6 +1975,8 @@ function renderBoosts(force = false) {
             min="1"
             placeholder="Nhập số vàng"
             class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
+            onfocus="isEditingBoostInput = true"
+            onblur="isEditingBoostInput = false"
             oninput="updateGoldToDiamondPreview()"
         />
         <button id="gold-to-diamond-confirm"
@@ -1976,7 +1994,13 @@ function renderBoosts(force = false) {
 }
 
 window.toggleBoostPanel = (key) => {
-    openedBoostPanel = openedBoostPanel === key ? null : key;
+    if (openedBoostPanel === key) {
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+    } else {
+        openedBoostPanel = key;
+        isEditingBoostInput = false;
+    }
     renderBoosts(true);
 };
 
