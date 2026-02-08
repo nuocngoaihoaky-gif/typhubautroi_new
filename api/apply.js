@@ -1,33 +1,18 @@
 import { db, rtdb, verifyInitData } from './_lib';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const ENERGY_REFILL_COOLDOWN = 15 * 60 * 1000; // 15 phút cooldown xem QC
-const MAX_AMOUNT_PER_TX = 1_000_000_000;       // Giới hạn 1 tỷ / lần giao dịch (Chống tràn số)
+const ENERGY_REFILL_COOLDOWN = 15 * 60 * 1000; 
+const MAX_AMOUNT_PER_TX = 1_000_000_000;       
 
-// ============================================================
-// 🔒 HÀM VALIDATE CHẶT CHẼ (Helper)
-// ============================================================
+// Helper Validate
 function parseStrictAmount(value, min = 1) {
-    // 1. Chuyển về string để check ký tự lạ
     const strVal = String(value).trim();
-
-    // 2. Regex: Chỉ cho phép ký tự số từ 0-9. Không dấu chấm (.), không dấu trừ (-), không e (10e5)
-    // Nếu có bất kỳ ký tự nào không phải số -> REJECT NGAY
     if (!/^\d+$/.test(strVal)) return null;
-
-    // 3. Chuyển sang Number
     const num = Number(strVal);
-
-    // 4. Check NaN và Finite
     if (isNaN(num) || !isFinite(num)) return null;
-
-    // 5. Check số nguyên an toàn (Dưới 9 triệu tỷ - giới hạn của JS)
     if (!Number.isSafeInteger(num)) return null;
-
-    // 6. Check khoảng giá trị (Min & Max Config)
     if (num < min) return null;
     if (num > MAX_AMOUNT_PER_TX) return null;
-
     return num;
 }
 
@@ -41,21 +26,17 @@ export default async function handler(req, res) {
     if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const uid = String(tgUser.id);
-    
-    // Lấy type và amount
     const { type, amount } = req.body; 
 
     const validTypes = ['multitap', 'limit', 'check_ad', 'buy_energy', 'gold_to_diamond'];
-    if (!validTypes.includes(type)) {
-        return res.status(400).json({ error: 'Invalid type' });
-    }
+    if (!validTypes.includes(type)) return res.status(400).json({ error: 'Invalid type' });
 
     const userRef = db.collection('users').doc(uid);
     const walletRef = rtdb.ref(`user_wallets/${uid}`);
 
     try {
         // ============================================================
-        // CASE 1: CHECK XEM QUẢNG CÁO HỒI NĂNG LƯỢNG
+        // CASE 1: CHECK AD (Giữ nguyên)
         // ============================================================
         if (type === 'check_ad') {
             const walletSnap = await walletRef.once('value');
@@ -73,26 +54,26 @@ export default async function handler(req, res) {
         }
 
         // ============================================================
-        // CASE 2: MUA NĂNG LƯỢNG BẰNG KIM CƯƠNG
-        // 100 KC = 1000 NL (Min 1000 NL)
+        // CASE 2: MUA NĂNG LƯỢNG (INPUT LÀ SỐ KIM CƯƠNG)
+        // 1 KC = 10 NL (Min 100 KC)
         // ============================================================
         if (type === 'buy_energy') {
-            // 🔒 VALIDATE INPUT
-            const wantEnergy = parseStrictAmount(amount, 1000); // Min 1000
-            if (!wantEnergy) {
-                return res.status(400).json({ error: 'Số lượng không hợp lệ (Min 1000)' });
+            // 🔒 Input là số KC muốn chi (Min 100 KC)
+            const spendDiamond = parseStrictAmount(amount, 100); 
+            if (!spendDiamond) {
+                return res.status(400).json({ error: 'Tối thiểu 100 Kim Cương' });
             }
 
-            // Tỷ lệ 10 NL = 1 KC (Ví dụ: 1000 NL tốn 100 KC)
-            // Dùng Math.ceil để làm tròn lên, tránh user nhập lẻ hòng bug
-            const costDiamond = Math.ceil(wantEnergy / 10); 
+            // Tính lượng năng lượng nhận được: 1 KC = 10 NL
+            const energyReceive = spendDiamond * 10;
             
             await walletRef.transaction((data) => {
                 if (data) {
-                    if ((data.diamond || 0) < costDiamond) throw new Error('NOT_ENOUGH_DIAMOND');
+                    if ((data.diamond || 0) < spendDiamond) throw new Error('NOT_ENOUGH_DIAMOND');
                     
-                    data.diamond -= costDiamond;
-                    data.energy = (data.energy || 0) + wantEnergy;
+                    data.diamond -= spendDiamond;
+                    // Cộng năng lượng (cho phép vượt max)
+                    data.energy = (data.energy || 0) + energyReceive;
                 }
                 return data;
             });
@@ -101,25 +82,25 @@ export default async function handler(req, res) {
         }
 
         // ============================================================
-        // CASE 3: ĐỔI VÀNG SANG KIM CƯƠNG
-        // 1000 Vàng = 100 KC (Min 1000 Vàng)
+        // CASE 3: ĐỔI VÀNG SANG KIM CƯƠNG (INPUT LÀ SỐ VÀNG)
+        // 10 Vàng = 1 KC (Min 1000 Vàng)
         // ============================================================
         if (type === 'gold_to_diamond') {
-            // 🔒 VALIDATE INPUT
-            const spendGold = parseStrictAmount(amount, 1000); // Min 1000
+            // 🔒 Input là số Vàng muốn đổi (Min 1000 Vàng)
+            const spendGold = parseStrictAmount(amount, 1000); 
             if (!spendGold) {
-                return res.status(400).json({ error: 'Số lượng không hợp lệ (Min 1000)' });
+                return res.status(400).json({ error: 'Tối thiểu 1000 Vàng' });
             }
 
-            // Tỷ lệ 10 Vàng = 1 KC
-            const getDiamond = Math.floor(spendGold / 10); 
+            // Tính lượng KC nhận được: 10 Vàng = 1 KC
+            const diamondReceive = Math.floor(spendGold / 10); 
 
             await walletRef.transaction((data) => {
                 if (data) {
                     if ((data.balance || 0) < spendGold) throw new Error('NOT_ENOUGH_GOLD');
                     
                     data.balance -= spendGold;
-                    data.diamond = (data.diamond || 0) + getDiamond;
+                    data.diamond = (data.diamond || 0) + diamondReceive;
                 }
                 return data;
             });
@@ -128,7 +109,7 @@ export default async function handler(req, res) {
         }
 
         // ============================================================
-        // CASE 4 & 5: NÂNG CẤP (Multitap & Limit) - Dùng Kim Cương
+        // CASE 4 & 5: NÂNG CẤP (Giữ nguyên)
         // ============================================================
         
         const userSnap = await userRef.get();
@@ -145,7 +126,6 @@ export default async function handler(req, res) {
             if (currentMultitapLv > currentLimitLv) {
                 return res.status(400).json({ error: `Cần nâng Bình xăng Lv.${currentLimitLv + 1} trước!` });
             }
-            // Max Level Check (Nếu có)
             if (currentMultitapLv >= 20) return res.status(400).json({ error: 'Max Level!' });
 
             costDiamond = 500 * Math.pow(2, currentMultitapLv - 1);
@@ -172,20 +152,16 @@ export default async function handler(req, res) {
             rtdbUpdates = { baseMaxEnergy: (userData.baseMaxEnergy || 1000) + 1000 };
         }
 
-        // Trừ tiền bên RTDB (Transaction)
         await walletRef.transaction((data) => {
             if (data) {
                 if ((data.diamond || 0) < costDiamond) throw new Error('NOT_ENOUGH_DIAMOND');
-                
                 data.diamond -= costDiamond;
-                
                 if (rtdbUpdates.tapValue) data.tapValue = rtdbUpdates.tapValue;
                 if (rtdbUpdates.baseMaxEnergy) data.baseMaxEnergy = rtdbUpdates.baseMaxEnergy;
             }
             return data;
         });
 
-        // Update Level bên Firestore
         await userRef.update(firestoreUpdates);
 
         return res.status(200).json({ ok: true });
