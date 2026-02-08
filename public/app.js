@@ -1715,12 +1715,24 @@ window.checkTaskAction = async () => {
     const btn = document.getElementById('task-btn-check');
     if (!btn || btn.disabled) return;
 
-    // 1. Xoay nút để báo đang xử lý
+    // 🔥 CHECK 1: Task này làm chưa?
+    if (state.completedTasks.includes(currentSelectedTask.id)) {
+        return showNotification('Bạn đã làm nhiệm vụ này rồi!', 'error');
+    }
+
+    // 🔥 CHECK 2 (Đối với Task Mời bạn bè): So sánh số lượng bạn bè hiện có
+    if (currentSelectedTask.type === 'invite') {
+        const required = currentSelectedTask.count || 0;
+        // Giả sử state.inviteCount là số lượng bạn bè đã mời (được load từ user api)
+        if (state.inviteCount < required) {
+            return showNotification(`Cần mời đủ ${required} bạn bè (Hiện tại: ${state.inviteCount})`, 'error');
+        }
+    }
+
+    // Nếu qua được các bước check trên thì mới gọi API
     setLoading(btn, true);
 
     try {
-        // 2. GỌI API CHECK NHIỆM VỤ
-        // Gửi ID nhiệm vụ lên, Server tự biết đó là task invite hay task tele để check
         const res = await fetch(`${API_BASE}/tasks`, {
             method: 'POST',
             headers: getHeaders(),
@@ -1729,30 +1741,25 @@ window.checkTaskAction = async () => {
 
         const data = await res.json();
 
-        if (!res.ok) {
-            // Nếu lỗi (ví dụ: chưa đủ bạn, chưa join nhóm) -> Ném lỗi ra để hiện thông báo
-            throw new Error(data.error || 'Chưa hoàn thành nhiệm vụ');
-        }
+        if (!res.ok) throw new Error(data.error || 'Chưa hoàn thành nhiệm vụ');
 
-        // 3. THÀNH CÔNG
+        // THÀNH CÔNG -> CẬP NHẬT LOCAL
         showNotification(`Đã nhận +${formatNumber(currentSelectedTask.reward)} kim cương`, 'success');
-        if (!state.completedTasks.includes(currentSelectedTask.id)) {
-            state.completedTasks.push(currentSelectedTask.id);
-        }
-        // Đóng modal
-        closeModal('modal-task');
-
-        // Cập nhật lại thông tin User (tiền, danh sách task đã làm) từ Server trả về
-        // (Giả sử API trả về balance mới và list task mới, hoặc ta gọi lại loadUserInfo)
-        await loadUserInfo({ silent: true });
         
-        // Vẽ lại danh sách nhiệm vụ để hiện dấu tích xanh
+        // 1. Cộng tiền
+        state.diamond += currentSelectedTask.reward;
+        
+        // 2. Đánh dấu đã làm
+        state.completedTasks.push(currentSelectedTask.id);
+        
+        // 3. Đóng modal & Render lại
+        closeModal('modal-task');
         renderTasks();
+        updateUI();
 
     } catch (e) {
         showNotification(e.message, 'error');
     } finally {
-        // 4. Dừng xoay
         setLoading(btn, false);
     }
 };
