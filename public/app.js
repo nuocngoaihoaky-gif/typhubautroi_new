@@ -1116,68 +1116,57 @@ function startLoops() {
 }
 
 function updateUI() {
+    // 1. Cập nhật số dư (Hiệu ứng chạy số)
     animateBalance(state.balance);
+    
+    // 2. Cập nhật Kim Cương
     const diamondEl = document.getElementById('mini-diamond-text');
-    if (diamondEl) {
-        // formatNumber giúp hiển thị đẹp (ví dụ 1,000 thay vì 1000)
-        diamondEl.innerText = formatNumber(state.diamond || 0); 
-    }
-    // ===== LEVEL TỪ SERVER =====
-    const levelIdx = Math.max(0, Math.min(
-        LEVEL_THRESHOLDS.length - 1,
-        state.level - 1
-    ));
+    if (diamondEl) diamondEl.innerText = formatNumber(state.diamond || 0);
 
+    // 3. Cập nhật Level & Progress Bar
+    const levelIdx = Math.max(0, Math.min(LEVEL_THRESHOLDS.length - 1, state.level - 1));
     const currentLevel = LEVEL_THRESHOLDS[levelIdx];
     const nextLevel = LEVEL_THRESHOLDS[levelIdx + 1];
 
     document.getElementById('level-name').innerText = currentLevel.name;
-    document.getElementById('level-idx').innerText =
-        `Lv ${state.level}/${LEVEL_THRESHOLDS.length}`;
+    document.getElementById('level-idx').innerText = `Lv ${state.level}/${LEVEL_THRESHOLDS.length}`;
 
     if (nextLevel) {
-        const percent = Math.min(
-            100,
-            Math.max(0, (state.exp / nextLevel.threshold) * 100)
-        );
-
+        const percent = Math.min(100, Math.max(0, (state.exp / nextLevel.threshold) * 100));
         document.getElementById('level-progress-bar').style.width = `${percent}%`;
-        document.getElementById('level-progress-text').innerText =
-            `${formatNumber(state.exp)} / ${formatNumber(nextLevel.threshold)}`;
+        document.getElementById('level-progress-text').innerText = `${formatNumber(state.exp)} / ${formatNumber(nextLevel.threshold)}`;
     } else {
         document.getElementById('level-progress-bar').style.width = '100%';
         document.getElementById('level-progress-text').innerText = 'MAX';
     }
 
-    // ===== ENERGY =====
+    // 4. Cập nhật Năng lượng & Tap
     document.getElementById('energy-display').innerText = Math.floor(state.energy);
     document.getElementById('max-energy-display').innerText = state.baseMaxEnergy;
-
-    // ===== TAP =====
     document.getElementById('tap-value').innerText = `+${state.tapValue}`;
 
-    // ===== INVESTMENTS =====
+    // 5. Cập nhật Thông tin Đầu tư (Header tab Mine)
     const activeCount = Object.keys(state.investments).length;
     let pending = 0;
     for (let id in state.investments) {
         const card = INVESTMENT_CARDS.find(c => c.id == id);
         if (card) pending += card.cost + card.profit;
     }
-
     document.getElementById('active-investments').innerText = `${activeCount} gói`;
     document.getElementById('pending-return').innerText = `+${formatNumber(pending)}`;
     document.getElementById('mine-active-count').innerText = `${activeCount} gói`;
     document.getElementById('mine-pending-return').innerText = `+${formatNumber(pending)}`;
     
-    // 🔥 SỬA: Dùng state.inviteCount thay vì state.friendsList.length
+    // 6. Cập nhật số bạn bè
     const friendCountEl = document.getElementById('friend-count');
     if(friendCountEl) friendCountEl.innerText = state.inviteCount;
 
+    // 7. Vẽ lại các thành phần con (Nếu đang mở tab đó)
+    // Chỉ vẽ lại Boosts nếu không đang nhập liệu
     if (!isEditingBoostInput) renderBoosts();
-    renderTasks();
-    renderFriends();
-    renderWithdrawHistory();
-    renderDaily();
+    
+    // 🔥 LƯU Ý: Không gọi renderTasks, renderFriends, renderWithdraw ở đây liên tục
+    // vì nó sẽ làm giật danh sách. Các hàm đó chỉ gọi khi chuyển Tab hoặc action cụ thể.
 }
 
 // =============================================================================
@@ -1284,18 +1273,18 @@ function renderInvestments() {
 
 // 1. MUA GÓI ĐẦU TƯ
 window.buyInvestment = async (id, btn) => {
-    // A. VALIDATE FRONTEND (Chặn ngay từ cửa để đỡ tốn Request)
+    // 1. VALIDATE FRONTEND (Chặn trước cho đỡ tốn API)
     if (!btn || btn.disabled || isTransactionPending) return;
 
     const card = INVESTMENT_CARDS.find(c => c.id === id);
     if (!card) return showNotification('Gói không tồn tại', 'error');
 
-    // Check 1: Đủ tiền không?
+    // Check tiền
     if (state.balance < card.cost) {
         return showNotification('Số dư không đủ!', 'error');
     }
 
-    // Check 2: Đủ Level không?
+    // Check level
     const currentLevelIdx = LEVEL_THRESHOLDS.findIndex((l, i) => {
         const next = LEVEL_THRESHOLDS[i + 1];
         return state.totalEarned >= l.threshold && (!next || state.totalEarned < next.threshold);
@@ -1305,12 +1294,11 @@ window.buyInvestment = async (id, btn) => {
         return showNotification(`Cần đạt cấp ${LEVEL_THRESHOLDS[card.levelReq].name}`, 'error');
     }
 
-    // Check 3: Đang mua rồi thì thôi
     if (state.investments[id]) {
         return showNotification('Gói này đang chạy rồi', 'error');
     }
 
-    // B. GỌI API
+    // 2. BẮT ĐẦU GỌI API (Chưa trừ tiền vội)
     isTransactionPending = true;
     setLoading(btn, true);
 
@@ -1327,24 +1315,24 @@ window.buyInvestment = async (id, btn) => {
             throw new Error(data.error || 'Lỗi kết nối');
         }
 
-        // C. THÀNH CÔNG -> TỰ CẬP NHẬT STATE (KHÔNG GỌI SYNC)
+        // ============================================================
+        // 3. API THÀNH CÔNG -> MỚI CẬP NHẬT GIAO DIỆN
+        // ============================================================
         showNotification('Đầu tư thành công!', 'success');
 
-        // 1. Trừ tiền thủ công
+        // Trừ tiền thật
         state.balance -= card.cost;
 
-        // 2. Kích hoạt gói thủ công
-        // Nếu Server trả về finish_time thì dùng, không thì tự tính (1 tiếng)
-        // Việc này giúp hiển thị đồng hồ đếm ngược ngay lập tức
+        // Kích hoạt gói (Dùng giờ server trả về hoặc tự tính)
         state.investments[id] = data.finish_time || (Date.now() + 3600000); 
 
-        // 3. Vẽ lại giao diện ngay lập tức
-        updateUI(); // Cập nhật số tiền trên header
-        renderInvestments(); // Chuyển nút Mua -> Đồng hồ
+        // Vẽ lại UI
+        updateUI(); 
+        renderInvestments();
 
     } catch (e) {
+        // Lỗi thì chỉ báo lỗi, không cần rollback vì chưa trừ gì cả
         showNotification(e.message, 'error');
-        // Lỗi thì thôi, tiền vẫn nguyên, nút vẫn nguyên
     } finally {
         isTransactionPending = false;
         setLoading(btn, false);
@@ -1353,23 +1341,20 @@ window.buyInvestment = async (id, btn) => {
 
 // 2. THU HOẠCH GÓI ĐẦU TƯ
 window.claimInvestment = async (id, btn) => {
-    // A. VALIDATE FRONTEND
+    // 1. VALIDATE
     if (!btn || btn.disabled || isTransactionPending) return;
 
     const card = INVESTMENT_CARDS.find(c => c.id === id);
     if (!card) return;
 
-    // Check: Đã đầu tư chưa?
     const finishTime = state.investments[id];
     if (!finishTime) return showNotification('Chưa đầu tư gói này', 'error');
 
-    // Check: Đã đến giờ chưa?
-    // Cho phép sai số 2 giây để user đỡ bị khó chịu
     if (Date.now() < finishTime - 2000) {
         return showNotification('Chưa đến giờ thu hoạch', 'error');
     }
 
-    // B. GỌI API
+    // 2. GỌI API
     isTransactionPending = true;
     setLoading(btn, true);
 
@@ -1386,22 +1371,17 @@ window.claimInvestment = async (id, btn) => {
             throw new Error(data.error || 'Lỗi kết nối');
         }
 
-        // C. THÀNH CÔNG -> TỰ CẬP NHẬT STATE (KHÔNG GỌI SYNC)
+        // ============================================================
+        // 3. API THÀNH CÔNG -> CỘNG TIỀN VÀ XÓA GÓI
+        // ============================================================
         const profit = card.cost + card.profit;
         showNotification(`Thu hoạch +${formatNumber(profit)}`, 'success');
 
-        // 1. Cộng tiền thủ công
         state.balance += profit;
-        
-        // 2. Xóa gói khỏi danh sách đang chạy
         delete state.investments[id];
 
-        // 3. Update tổng thu nhập (nếu cần để tính level)
-        // state.totalEarned += profit; 
-
-        // 4. Vẽ lại giao diện
         updateUI();
-        renderInvestments(); // Chuyển nút Nhận -> Mua lại
+        renderInvestments();
 
     } catch (e) {
         showNotification(e.message, 'error');
@@ -2364,9 +2344,10 @@ async function switchTab(tabName) {
 // 🔥 HÀM MỚI: ĐỒNG BỘ NHANH (GỌI API/SYNC)
 // Dùng khi chuyển tab hoặc sau khi thực hiện hành động nhỏ
 // 🔥 HÀM ĐỒNG BỘ NHANH (GỌI API/SYNC)
+// 🔥 HÀM ĐỒNG BỘ NHANH (GỌI API/SYNC)
 async function syncGameData() {
     try {
-        // Gọi API sync nhẹ
+        // 1. Gọi API
         const res = await fetch(`${API_BASE}/sync`, { 
             method: 'POST', 
             headers: getHeaders() 
@@ -2375,14 +2356,23 @@ async function syncGameData() {
         if (!res.ok) return;
         const data = await res.json();
 
-        // Chỉ cập nhật các chỉ số biến động
+        // 2. Cập nhật State (Chỉ lấy những cái hay thay đổi)
         if (data.balance !== undefined) state.balance = data.balance;
         if (data.diamond !== undefined) state.diamond = data.diamond;
         if (data.energy !== undefined) state.energy = data.energy;
         if (data.baseMaxEnergy !== undefined) state.baseMaxEnergy = data.baseMaxEnergy;
+        
+        // Cập nhật giờ server nếu có (để tính cooldown chuẩn)
+        if (data.server_time) {
+            serverTimeOffset = data.server_time - Date.now();
+        }
 
-        // Vẽ lại UI các chỉ số này
+        // 3. 🔥 QUAN TRỌNG: VẼ LẠI GIAO DIỆN NGAY LẬP TỨC
         updateUI(); 
+        
+        // Vẽ lại danh sách đầu tư (để cập nhật nút Mua sáng/tối theo tiền mới)
+        renderInvestments(); 
+
     } catch (e) {
         console.warn("Sync error:", e);
     }
