@@ -10,11 +10,13 @@
 
     <link rel="stylesheet" href="style.css">
     <style>
+        /* ================= LOADING SCREEN CSS ================= */
         body {
             background-color: #0f0f1a;
             margin: 0;
             padding: 0;
             overflow: hidden;
+            font-family: 'ui-sans-serif', 'system-ui', 'sans-serif';
         }
 
         #loading-screen {
@@ -23,7 +25,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background-color: #0f0f1a;
+            background: #0f0f1a;
             z-index: 99999;
             display: flex;
             flex-direction: column;
@@ -32,28 +34,92 @@
             transition: opacity 0.5s ease-out;
         }
 
-        #loading-screen.hidden-load {
-            opacity: 0;
-            pointer-events: none;
+        /* Hiệu ứng nền mờ ảo */
+        .loading-bg {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, #1e3a8a 0%, #0f0f1a 70%);
+            opacity: 0.6;
+            z-index: -1;
+        }
+
+        /* Ảnh Logo Game */
+        .loading-logo {
+            width: 280px; /* Điều chỉnh kích thước ảnh */
+            max-width: 80%;
+            height: auto;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); /* Ánh sáng xanh bao quanh */
+            margin-bottom: 40px;
+            animation: float 3s ease-in-out infinite; /* Hiệu ứng bay bổng */
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Thanh Loading */
+        .loading-bar-container {
+            width: 70%;
+            max-width: 300px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .loading-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+            background-size: 200% 100%;
+            width: 0%; /* JS sẽ update cái này */
+            border-radius: 10px;
+            animation: shimmer 1.5s infinite linear;
+            transition: width 0.3s ease-out;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        .loading-text {
+            color: #9ca3af;
+            font-size: 12px;
+            margin-top: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .plane-icon {
+            position: absolute;
+            top: -25px;
+            right: -10px;
+            font-size: 20px;
+            transform: rotate(45deg);
+            filter: drop-shadow(0 0 5px #3b82f6);
         }
     </style>
 </head>
 <body>
 
-    <!-- LOADING SCREEN -->
-    <div id="loading-screen" class="fixed inset-0 bg-[#0f0f1a] z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="relative w-24 h-24 flex items-center justify-center mb-6">
-            <div class="absolute inset-0 border-4 border-blue-500/30 rounded-full animate-ping-slow"></div>
-            <div class="text-6xl animate-bounce">✈️</div>
+    <div id="loading-screen">
+        <div class="loading-bg"></div>
+        
+        <img src="https://i.imgur.com/zoDGpUC.jpeg" alt="Tỷ Phú Bầu Trời" class="loading-logo" 
+             onerror="this.src='https://placehold.co/300x200/1e293b/white?text=TY+PHU+BAU+TROI'"> 
+        <div class="relative w-[70%] max-w-[300px]">
+            <div class="loading-bar-container">
+                <div id="loading-progress" class="loading-bar-fill"></div>
+            </div>
         </div>
-        <div class="text-yellow-400 font-bold text-2xl tracking-widest">TỶ PHÚ BẦU TRỜI</div>
-        <div class="text-gray-500 text-sm mt-2 flex items-center gap-1">
-            <span>Loading</span>
-            <span class="animate-pulse">...</span>
-        </div>
-        <div class="w-48 h-1 bg-gray-800 rounded-full mt-6 overflow-hidden">
-            <div class="h-full bg-blue-500 w-1/2 animate-[spin-slow_2s_linear_infinite]" style="width: 100%; transform-origin: left;"></div>
-        </div>
+
+        <div id="loading-text" class="loading-text">Đang khởi động động cơ...</div>
     </div>
 
     <div class="absolute top-0 left-0 w-full h-full z-0 overflow-hidden pointer-events-none">
@@ -62,38 +128,24 @@
 
     <div class="z-10 flex flex-col h-full w-full max-w-lg mx-auto bg-black/20 border-x border-white/5 h-screen relative">
 
-        <!-- ================= HEADER WRAPPER (FIX DÍNH TOP) ================= -->
         <div class="pt-4 px-4 pb-2 z-20 relative flex-shrink-0">
-
-            <!-- HEADER -->
             <div class="flex items-center mb-4">
-                <!-- LEFT -->
                 <div class="flex items-center gap-2 bg-[#2d2d3e]/80 py-1 px-3 rounded-full border border-white/10">
                     <span class="text-xl">✈️</span>
                     <span class="text-sm font-bold">Tỷ Phú Bầu Trời</span>
                 </div>
-
-                <!-- RIGHT -->
                 <div class="ml-auto flex items-center gap-2">
-                    <div
-                        id="mini-diamond"
-                        data-ready="false"
-                        class="items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                    <div id="mini-diamond" class="items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10 flex">
                         <span class="text-lg">💎</span>
                         <span id="mini-diamond-text" class="text-sm font-bold text-blue-400">0</span>
                     </div>
-
-                    <div
-                        id="mini-balance"
-                        data-ready="false"
-                        class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                    <div id="mini-balance" class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
                         <span class="text-lg">💰</span>
                         <span id="mini-balance-text" class="text-sm font-bold text-yellow-400">0</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Level Bar -->
             <div class="w-full mb-3">
                 <div class="flex justify-between items-center mb-1">
                     <div class="flex items-center gap-2">
@@ -106,11 +158,8 @@
                     <div id="level-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out" style="width: 0%"></div>
                 </div>
             </div>
-
         </div>
-        <!-- ================= END HEADER WRAPPER ================= -->
 
-        <!-- TAB: EXCHANGE -->
         <div id="tab-exchange" class="tab-content active px-4 pb-32 overflow-y-auto relative">
             <div class="flex w-full justify-between items-stretch mb-4 gap-2 z-20 relative">
                 <div class="flex-1 bg-[#2d2d3e]/90 backdrop-blur p-2 rounded-xl border border-[#3d3d52] flex flex-col items-center justify-center">
@@ -139,37 +188,26 @@
                 </div>
             </div>
 
-            <div id="game-container" class="relative w-full aspect-[4/3] mx-auto rounded-2xl overflow-hidden shadow-2xl border-4 border-[#2d2d3e] mb-4 bg-gray-900 select-none cursor-pointer flex-shrink-0">
-                <!-- Nội dung game -->
-            </div>
+            <div id="game-container" class="relative w-full aspect-[4/3] mx-auto rounded-2xl overflow-hidden shadow-2xl border-4 border-[#2d2d3e] mb-4 bg-gray-900 select-none cursor-pointer flex-shrink-0"></div>
 
             <div class="w-full max-w-[340px] mx-auto z-20 relative mt-auto">
                 <div class="flex items-center justify-between mb-3 px-2">
                     <div class="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-full border border-white/10 w-full relative">
                         <i data-lucide="zap" class="w-5 h-5 text-yellow-400 fill-current"></i>
                         <span class="font-bold text-sm flex-1"><span id="energy-display">1000</span> <span class="text-gray-400">/ <span id="max-energy-display">1000</span></span></span>
-                        
                         <button onclick="openModal('modal-boost')" class="flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border border-indigo-400 hover:scale-105 active:scale-95 transition-transform">
                             <i data-lucide="rocket" class="w-4 h-4"></i>
                             <span class="text-xs font-bold">Nâng Cấp</span>
                         </button>
                     </div>
                 </div>
-
-                <button
-                    id="main-action-btn"
-                    data-state="idle"
-                    class="w-full py-4 rounded-2xl font-black text-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide border-b-4 bg-gradient-to-b from-blue-500 to-blue-600 border-blue-800 text-white">
-
+                <button id="main-action-btn" class="w-full py-4 rounded-2xl font-black text-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide border-b-4 bg-gradient-to-b from-blue-500 to-blue-600 border-blue-800 text-white">
                     <i data-lucide="plane" class="w-6 h-6"></i>
                     <span class="btn-text">CẤT CÁNH</span>
-
                 </button>
-
             </div>
         </div>
 
-        <!-- TAB: MINE -->
         <div id="tab-mine" class="tab-content px-4 pb-32 overflow-y-auto relative">
             <div class="bg-[#2d2d3e] rounded-2xl p-4 mb-6 border border-[#3d3d52] mt-4 shadow-lg">
                 <div class="flex justify-between items-center mb-2">
@@ -178,13 +216,12 @@
                 </div>
                 <div class="flex items-end gap-2">
                     <div class="text-3xl font-black text-green-400 drop-shadow-md" id="mine-pending-return">+0</div>
-                    <span class="text-xs text-gray-400 mb-1.5">sắp nhận về</span>
+                    <span class="text-xs text-gray-400 mb-1.5">💰 sắp nhận về</span>
                 </div>
             </div>
             <div id="investment-list" class="grid grid-cols-2 gap-3 pb-8"></div>
         </div>
 
-        <!-- TAB: QUESTS -->
         <div id="tab-quests" class="tab-content px-4 pb-32 overflow-y-auto relative">
             <div class="bg-[#2d2d3e] rounded-2xl p-6 mb-6 border border-[#3d3d52] text-center mt-4">
                 <div class="w-16 h-16 bg-blue-900/50 rounded-full flex items-center justify-center mx-auto mb-3 border border-blue-700 shadow-[0_0_20px_rgba(37,99,235,0.3)]">
@@ -202,79 +239,35 @@
             </div>
         </div>
 
-<!-- TAB: FRIENDS (ĐỘI BAY - NEW) -->
-<div id="tab-friends" class="tab-content px-4 pb-32 overflow-y-auto relative">
-
-    <!-- STATS -->
-    <div class="grid grid-cols-2 gap-3 mb-6">
-        <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
-            <div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                <i data-lucide="users" class="w-4 h-4 text-blue-400"></i>
-                Lượt mời
+        <div id="tab-friends" class="tab-content px-4 pb-32 overflow-y-auto relative">
+            <div class="grid grid-cols-2 gap-3 mb-6 mt-4">
+                <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+                    <div class="text-xs text-gray-400 mb-1 flex items-center gap-1"><i data-lucide="users" class="w-4 h-4 text-blue-400"></i> Lượt mời</div>
+                    <div id="invite-count" class="text-2xl font-black text-white">0</div>
+                </div>
+                <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+                    <div class="text-xs text-gray-400 mb-1 flex items-center gap-1"><i data-lucide="wallet" class="w-4 h-4 text-green-400"></i> Tổng thu</div>
+                    <div id="invite-earn" class="text-2xl font-black text-white">0</div>
+                </div>
             </div>
-            <div id="invite-count" class="text-2xl font-black text-white">0</div>
-        </div>
-
-        <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
-            <div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                <i data-lucide="wallet" class="w-4 h-4 text-green-400"></i>
-                Tổng thu
+            <div class="bg-[#2d2d3e]/90 rounded-2xl p-5 border border-[#3d3d52] mb-5 text-center">
+                <div class="text-sm font-bold text-white mb-3">Quét mã để tham gia</div>
+                <div class="bg-white p-3 rounded-xl inline-block"><img id="invite-qr" class="w-44 h-44" /></div>
             </div>
-            <div id="invite-earn" class="text-2xl font-black text-green-400">0</div>
+            <div class="bg-[#1c1c2e] rounded-xl p-3 border border-white/10 flex items-center gap-2 mb-4">
+                <input id="invite-link" readonly class="flex-1 bg-transparent text-xs text-gray-300 outline-none" />
+                <button onclick="copyInviteLink()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold active:scale-95 transition">COPY</button>
+            </div>
+            <div class="bg-[#2d2d3e]/80 rounded-xl p-4 border border-[#3d3d52] text-sm text-gray-300 space-y-2">
+                <div class="flex gap-2"><span class="text-yellow-400">⭐</span><span>Gửi mã QR hoặc link giới thiệu cho bạn bè.</span></div>
+                <div class="flex gap-2"><span class="text-yellow-400">⭐</span><span>Nhận <b class="text-yellow-400">10.000💎</b> khi bạn bè tạo tài khoản và bay chuyến bay đầu tiên.</span></div>
+                <div class="flex gap-2"><span class="text-yellow-400">⭐</span><span>Kim cương có thể dùng để nâng cấp hoặc đổi năng lượng.</span></div>
+            </div>
         </div>
-    </div>
 
-    <!-- QR -->
-    <div class="bg-[#2d2d3e]/90 rounded-2xl p-5 border border-[#3d3d52] mb-5 text-center">
-        <div class="text-sm font-bold text-white mb-3">
-            Quét mã để tham gia
-        </div>
-
-        <div class="bg-white p-3 rounded-xl inline-block">
-            <img id="invite-qr" class="w-44 h-44" />
-        </div>
-    </div>
-
-    <!-- LINK -->
-    <div class="bg-[#1c1c2e] rounded-xl p-3 border border-white/10 flex items-center gap-2 mb-4">
-        <input
-            id="invite-link"
-            readonly
-            class="flex-1 bg-transparent text-xs text-gray-300 outline-none"
-        />
-        <button
-            onclick="copyInviteLink()"
-            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500
-                   text-white text-xs font-bold active:scale-95 transition">
-            COPY
-        </button>
-    </div>
-
-    <!-- DESCRIPTION -->
-    <div class="bg-[#2d2d3e]/80 rounded-xl p-4 border border-[#3d3d52]
-                text-sm text-gray-300 space-y-2">
-        <div class="flex gap-2">
-            <span class="text-yellow-400">⭐</span>
-            <span>Gửi mã QR hoặc link giới thiệu cho bạn bè.</span>
-        </div>
-        <div class="flex gap-2">
-            <span class="text-yellow-400">⭐</span>
-            <span>Nhận <b class="text-yellow-400">10.000💎</b> khi bạn bè tạo tài khoản và bay chuyến bay đầu tiên.</span>
-        </div>
-        <div class="flex gap-2">
-            <span class="text-yellow-400">⭐</span>
-            <span>Kim cương có thể dùng để nâng cấp hoặc đổi năng lượng.</span>
-        </div>
-    </div>
-
-</div>
-
-        <!-- TAB: WITHDRAW -->
         <div id="tab-withdraw" class="tab-content px-4 pb-32 overflow-y-auto relative">
             <div class="bg-[#2d2d3e] rounded-2xl p-6 mb-6 border border-[#3d3d52] flex flex-col items-center mt-4">
-                <div class="w-20 h-20 bg-purple-900/30 rounded-full flex items-center justify-center mb-4 border border-purple-500/50">
-                    <i data-lucide="wallet" class="w-10 h-10 text-purple-400"></i>
-                </div>
+                <div class="w-20 h-20 bg-purple-900/30 rounded-full flex items-center justify-center mb-4 border border-purple-500/50"><i data-lucide="wallet" class="w-10 h-10 text-purple-400"></i></div>
                 <h2 class="text-xl font-bold text-white">Rút Tiền Về Tài Khoản</h2>
                 <div class="flex items-center gap-2 mt-2 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
                     <span class="text-gray-400 text-xs">Số dư khả dụng:</span>
@@ -284,7 +277,6 @@
             </div>
             <div class="bg-[#1c1c1e] rounded-2xl p-5 border border-white/10 mb-6">
                 <div class="space-y-4">
-                    
                     <div class="relative">
                         <select id="bank-name" class="w-full bg-[#2c2c2e] text-white text-sm rounded-xl py-3 px-4 border border-white/5 focus:border-blue-500 outline-none appearance-none">
                             <option value="" disabled selected>Chọn ngân hàng</option>
@@ -297,11 +289,8 @@
                             <option value="TPB">TPBank</option>
                             <option value="VPB">VPBank</option>
                         </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400">
-                            <i data-lucide="chevron-down" class="w-4 h-4"></i>
-                        </div>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400"><i data-lucide="chevron-down" class="w-4 h-4"></i></div>
                     </div>
-
                     <input type="number" id="account-number" placeholder="Số Tài Khoản" class="w-full bg-[#2c2c2e] text-white text-sm rounded-xl py-3 px-4 border border-white/5 focus:border-blue-500 outline-none">
                     <input type="text" id="account-holder" placeholder="Tên Chủ Tài Khoản" class="w-full bg-[#2c2c2e] text-white text-sm rounded-xl py-3 px-4 border border-white/5 focus:border-blue-500 outline-none uppercase">
                     <div>
@@ -317,7 +306,6 @@
             </div>
         </div>
 
-        <!-- BOTTOM NAV -->
         <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-md bg-[#1a1a24]/95 backdrop-blur-xl rounded-2xl border border-white/10 p-2 grid grid-cols-5 gap-1 z-50 shadow-2xl">
             <button onclick="switchTab('exchange')" class="nav-btn active rounded-lg py-2 flex flex-col items-center justify-center gap-1" id="nav-exchange"><i data-lucide="plane" class="w-5 h-5"></i><span class="text-[9px]">Bay</span></button>
             <button onclick="switchTab('mine')" class="nav-btn rounded-lg py-2 flex flex-col items-center justify-center gap-1" id="nav-mine"><i data-lucide="pickaxe" class="w-5 h-5"></i><span class="text-[9px]">Đầu tư</span></button>
@@ -327,7 +315,6 @@
         </div>
     </div>
 
-    <!-- MODAL BOOST -->
     <div id="modal-boost" class="modal-overlay" onclick="closeModal('modal-boost')">
         <div class="w-full max-w-sm bg-[#1c1c1e] rounded-2xl p-5 border border-white/10 animate-zoom-in relative mx-4" onclick="event.stopPropagation()">
             <button class="absolute top-4 right-4 text-gray-400" onclick="closeModal('modal-boost')"><i data-lucide="x" class="w-6 h-6"></i></button>
@@ -339,46 +326,46 @@
         </div>
     </div>
 
-    <!-- MODAL TASK -->
     <div id="modal-task" class="modal-overlay" onclick="closeModal('modal-task')">
         <div class="w-full max-w-sm bg-[#1c1c1e] rounded-2xl p-6 border border-white/10 animate-zoom-in relative mx-4" onclick="event.stopPropagation()">
             <button class="absolute top-4 right-4 text-gray-400" onclick="closeModal('modal-task')"><i data-lucide="x" class="w-6 h-6"></i></button>
             <div class="flex flex-col items-center text-center mb-6 pt-2">
                 <div class="w-20 h-20 bg-[#2c2c2e] rounded-2xl flex items-center justify-center mb-4 text-4xl shadow-lg border border-white/5" id="task-icon">📺</div>
                 <h2 class="text-xl font-bold text-white mb-2" id="task-name">Tên nhiệm vụ</h2>
-                <div class="flex items-center gap-1 bg-yellow-900/30 px-3 py-1 rounded-full border border-yellow-700/50">
-                    <span class="text-lg">💰</span>
-                    <span class="text-xl font-black text-yellow-400" id="task-reward">+0</span>
+                <div class="flex items-center gap-1 bg-blue-900/30 px-3 py-1 rounded-full border border-blue-700/50">
+                    <span class="text-xl font-black text-blue-400" id="task-reward">+0</span>
+                    <span class="text-lg">💎</span>
                 </div>
             </div>
-            <button onclick="doTaskAction()" class="w-full py-3 mb-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all" id="task-btn-action">
-                Tham gia ngay <i data-lucide="chevron-right" class="w-4 h-4"></i>
-            </button>
-            <button onclick="checkTaskAction()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all" id="task-btn-check">
-                Kiểm tra
-            </button>
+            <button onclick="doTaskAction()" class="w-full py-3 mb-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all" id="task-btn-action">Tham gia ngay <i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+            <button onclick="checkTaskAction()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all" id="task-btn-check">Kiểm tra</button>
         </div>
     </div>
 
-    <!-- ========================================= -->
-    <!-- PHẦN 3: JAVASCRIPT (LOGIC) -->
-    <!-- ========================================= -->
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <script src="app.js"></script>
     <script>
-        // Hàm phụ để tắt loading nếu app.js bị lỗi hoặc tải chậm
+        // JS tạo hiệu ứng Loading giả lập
         window.addEventListener('load', () => {
-           // Mặc định app.js sẽ lo việc này, nhưng thêm vào cho chắc
-           const loader = document.getElementById('loading-screen');
-           if(loader && !loader.classList.contains('hidden')) {
-               // Đợi 1 chút rồi tắt nếu chưa tắt
-               setTimeout(() => {
-                   if(document.body.innerHTML.length > 500) { // Check xem đã render chưa
-                       loader.style.opacity = '0';
-                       setTimeout(() => loader.remove(), 500);
-                   }
-               }, 2000); 
-           }
+            const bar = document.getElementById('loading-progress');
+            const text = document.getElementById('loading-text');
+            
+            // Giả lập tiến trình (nếu app.js chưa kịp load)
+            let w = 0;
+            const intv = setInterval(() => {
+                if(w < 90) { // Chạy đến 90% rồi đợi
+                    w += Math.random() * 5;
+                    if(w > 90) w = 90;
+                    bar.style.width = w + '%';
+                    
+                    if(w < 30) text.innerText = 'Đang khởi động động cơ...';
+                    else if(w < 60) text.innerText = 'Đang kết nối vệ tinh...';
+                    else text.innerText = 'Đang tải dữ liệu...';
+                }
+            }, 100);
+
+            // Khi App.js load xong (nó sẽ gọi hàm ẩn loading), interval này sẽ bị clear
+            window.stopLoadingSim = () => clearInterval(intv);
         });
     </script>
 </body>
