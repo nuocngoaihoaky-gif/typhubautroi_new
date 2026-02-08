@@ -2017,36 +2017,25 @@ window.updateBuyEnergyPreview = () => {
     const ENERGY_PER_DIAMOND = 50;
     const want = parseInt(input.value, 10);
 
-    // ❌ Không nhập / nhập linh tinh
     if (!want || want <= 0) {
         btn.innerText = '💎 0';
         btn.disabled = true;
         return;
     }
 
-    // ❌ Đã full năng lượng
-    const canFill = state.baseMaxEnergy - state.energy;
-    if (canFill <= 0) {
-        btn.innerText = 'Đã đầy';
-        btn.disabled = true;
-        return;
-    }
+    // ✅ KHÔNG GIỚI HẠN MAX NỮA
+    const diamondsNeed = Math.ceil(want / ENERGY_PER_DIAMOND);
 
-    // ✅ Giới hạn năng lượng được mua
-    const energyToBuy = Math.min(want, canFill);
-    const diamondsNeed = Math.ceil(energyToBuy / ENERGY_PER_DIAMOND);
-
-    // ❌ Không đủ kim cương
     if (diamondsNeed > state.diamond) {
-        btn.innerText = `Thiếu 💎`;
+        btn.innerText = 'Thiếu 💎';
         btn.disabled = true;
         return;
     }
 
-    // ✅ OK
     btn.innerText = `Mua (${diamondsNeed} 💎)`;
     btn.disabled = false;
 };
+
 
 
 window.confirmBuyEnergy = (btn) => {
@@ -2091,78 +2080,79 @@ window.updateGoldToDiamondPreview = () => {
 };
 
 
-window.confirmGoldToDiamond = (btn) => {
-    const input = document.getElementById('gold-to-diamond-input');
-    if (!input) return;
-
-    const gold = parseInt(input.value, 10);
-    if (!gold || gold <= 0) return;
-
-    btn.dataset.amount = gold;
-
-    openedBoostPanel = null;
-    isEditingBoostInput = false;
-
-    applyBoost('gold_to_diamond', btn);
-};
-
-
 window.applyBoost = async (type, btn) => {
-    // 1. Chặn click đúp
     if (!btn || btn.disabled) return;
     setLoading(btn, true);
 
     try {
-        // ============================================================
-        // BƯỚC 1: GỌI API TRƯỚC (Check điều kiện & Update DB luôn)
-        // ============================================================
-        // Server sẽ check:
-        // - Nếu là energy: Còn lượt 6/6 không? -> Nếu còn thì trừ lượt, hồi máu luôn.
-        // - Nếu là turbo/limit: Đủ tiền không? -> Nếu đủ thì trừ tiền, lên cấp luôn.
+        const payload = { type };
+
+        // ✅ GỬI AMOUNT
+        if (type === 'buy_energy' || type === 'gold_to_diamond') {
+            payload.amount = parseInt(btn.dataset.amount || 0);
+        }
+
         const res = await fetch(`${API_BASE}/apply`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ type })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Thao tác thất bại');
 
-        // 🛑 Nếu Server bảo Lỗi (Hết lượt, Thiếu tiền...) -> Dừng ngay, KHÔNG hiện QC
-        if (!res.ok) {
-            throw new Error(data.error || 'Nâng cấp thất bại');
-        }
+        showNotification('Thành công!', 'success');
 
-        // ============================================================
-        // BƯỚC 2: API NGON RỒI -> MỚI HIỆN QUẢNG CÁO (TRẢ NỢ)
-        // ============================================================
-        if (type === 'energy') {
-            try {
-                //await showEnergyAd();
-                await new Promise(r => setTimeout(r, 1200));
-                showNotification('Hồi năng lượng thành công!', 'success');
-            } catch (qcError) {
-                showNotification(qcError.message, 'error');
-                return;
-            }
-        } else {
-            showNotification('Nâng cấp thành công!', 'success');
-        }
-            
-
-        // ============================================================
-        // BƯỚC 3: CẬP NHẬT GIAO DIỆN
-        // ============================================================
-
-        // Sync lại user (tiền, level, energy...) để khớp với Server
         await loadUserInfo({ silent: true });
 
-        // Vẽ lại boosts (để cập nhật số lượt còn lại 5/6...)
-        renderBoosts();
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+
+        renderBoosts(true);
         updateUI();
 
     } catch (e) {
-        // Lỗi từ API (Bước 1) sẽ nhảy vào đây
-        showNotification(e.message || 'Không thể nâng cấp', 'error');
+        showNotification(e.message || 'Lỗi', 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+};
+
+
+
+window.applyBoost = async (type, btn) => {
+    if (!btn || btn.disabled) return;
+    setLoading(btn, true);
+
+    try {
+        const payload = { type };
+
+        // ✅ GỬI AMOUNT
+        if (type === 'buy_energy' || type === 'gold_to_diamond') {
+            payload.amount = parseInt(btn.dataset.amount || 0);
+        }
+
+        const res = await fetch(`${API_BASE}/apply`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Thao tác thất bại');
+
+        showNotification('Thành công!', 'success');
+
+        await loadUserInfo({ silent: true });
+
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+
+        renderBoosts(true);
+        updateUI();
+
+    } catch (e) {
+        showNotification(e.message || 'Lỗi', 'error');
     } finally {
         setLoading(btn, false);
     }
@@ -2170,7 +2160,19 @@ window.applyBoost = async (type, btn) => {
 
 
 window.openModal = (id) => { document.getElementById(id).classList.add('open'); }
-window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); }
+window.closeModal = (id) => {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+
+    modal.classList.remove('open');
+
+    // 🔥 RESET TRẠNG THÁI BOOST KHI ĐÓNG
+    if (id === 'modal-boost') {
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+    }
+};
+
 // =========================================
 // LOGIN & SYNC USER (SERVER AUTHORITATIVE)
 // =========================================
