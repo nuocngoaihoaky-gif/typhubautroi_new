@@ -1505,18 +1505,17 @@ function renderTasks() {
 }
 // 🔥 HÀM MỚI: XỬ LÝ TASK #0 (XEM QC NHẬN KIM CƯƠNG)
 window.claimEnergyTask = async (btn) => {
+    // 1. Chặn click đúp
     if (!btn || btn.disabled) return;
-    
-    try {
-        setLoading(btn, true);
-        await showEnergyAd(); 
-    } catch (e) {
-        showNotification(e.message, 'error');
-        setLoading(btn, false);
-        return;
-    }
+    setLoading(btn, true);
 
     try {
+        // ============================================================
+        // BƯỚC 1: GỌI API TRƯỚC (Check cooldown & Nhận thưởng server)
+        // ============================================================
+        // Server sẽ check:
+        // - Nếu chưa hết giờ -> Trả về lỗi 400 -> Nhảy xuống catch -> KHÔNG hiện QC
+        // - Nếu OK -> Cộng tiền DB -> Trả về 200
         const res = await fetch(`${API_BASE}/apply`, {
             method: 'POST',
             headers: getHeaders(),
@@ -1524,23 +1523,41 @@ window.claimEnergyTask = async (btn) => {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Lỗi nhận thưởng');
 
+        // 🛑 Nếu Server bảo Lỗi (Chưa hết thời gian chờ...) -> Dừng ngay
+        if (!res.ok) {
+            throw new Error(data.error || 'Vui lòng chờ thêm ít phút');
+        }
+
+        // ============================================================
+        // BƯỚC 2: API NGON RỒI -> MỚI HIỆN QUẢNG CÁO (TRẢ NỢ)
+        // ============================================================
+        try {
+            await showEnergyAd();
+            // Delay nhẹ tạo cảm giác xử lý mượt mà (giống applyBoost)
+            await new Promise(r => setTimeout(r, 1200));
+        } catch (qcError) {
+            // Nếu tắt ngang QC hoặc lỗi QC
+            showNotification(qcError.message, 'error');
+            return;
+        }
+
+        // ============================================================
+        // BƯỚC 3: CẬP NHẬT GIAO DIỆN
+        // ============================================================
         const reward = data.reward || Math.floor((state.baseMaxEnergy || 1000) / 10);
         showNotification(`Nhận thành công +${formatNumber(reward)}💎`, 'success');
         
-        // 🔥 SỬA Ở ĐÂY: Dùng syncGameData() cho nhẹ
+        // 🔥 Dùng syncGameData() cho nhẹ (theo yêu cầu của bạn)
         await syncGameData();
         
-        // Riêng cái này cần cập nhật lại thời gian hồi chiêu nextRefillAt
-        // Vì api/sync.js không trả về nextRefillAt, nên ta tự tính local hoặc
-        // nếu api apply trả về thì dùng luôn. 
-        // Cách đơn giản nhất: Tự cộng 15 phút vào state để UI đếm ngược ngay
+        // Tự set thời gian hồi chiêu local để UI chuyển sang đếm ngược ngay lập tức
         state.nextRefillAt = Date.now() + (15 * 60 * 1000); 
         
         renderTasks();
 
     } catch (e) {
+        // Lỗi từ API (Bước 1) sẽ nhảy vào đây
         showNotification(e.message, 'error');
     } finally {
         setLoading(btn, false);
