@@ -919,7 +919,10 @@ async function cashOut() {
         checkTimer = null;
     }
 
-    // 3. UI GIỮ NGUYÊN
+    // 3. UI GIỮ NGUYÊN (Hoặc hiện loading trên nút nếu thích)
+    const btn = document.getElementById('main-action-btn');
+    // Giữ nguyên text hiển thị tiền để user đỡ hoang mang, chỉ thêm icon loading nếu cần
+    // btn.innerHTML = ... 
     
     // 4. GỌI SERVER
     let data;
@@ -935,6 +938,7 @@ async function cashOut() {
     } catch (e) {
         console.error("Cashout error:", e);
         // Nếu lỗi mạng khi nhảy -> Coi như mất kết nối -> Nổ (hoặc xử lý tùy ý)
+        // QUAN TRỌNG: Phải gọi crash để reset game, nếu không sẽ bị đơ mãi mãi
         crash(currentRunMoney); 
         return;
     }
@@ -949,8 +953,8 @@ async function cashOut() {
 
     // Trường hợp tốt: THÀNH CÔNG
     if (data.ok) {
-        clearInterval(flightInterval); // Dừng máy bay bay
-        // clearInterval(checkTimer); // Đã clear ở trên rồi, nhưng thừa ko sao
+        // Dừng bay visual
+        clearInterval(flightInterval); 
         
         isFlying = false;
         flightResolved = true;
@@ -965,7 +969,7 @@ async function cashOut() {
         
         updateUI();
 
-        // Hiệu ứng
+        // Hiệu ứng Thành công
         renderGameScene('SUCCESS', lastPlanePos.x, lastPlanePos.y);
         const label = document.querySelector('#overlay-success span');
         if (label) label.innerText = `+${formatNumber(profit)}`;
@@ -990,13 +994,13 @@ async function cashOut() {
         }
 
         // Chờ animation xong thì Reset luôn
+        // QUAN TRỌNG: Phải có bước này game mới chơi tiếp được
         await new Promise(r => setTimeout(r, MIN_RESET_DELAY));
         
         // Reset game & Sync tiền
         resetGame(); 
     }
 }
-
 // Reset Game
 async function resetGame() {
     clearInterval(fallingInterval);
@@ -1020,7 +1024,7 @@ async function resetGame() {
     // ⏳ Đợi server ổn định
     await new Promise(r => setTimeout(r, 400));
     
-    // 🔥 SỬA Ở ĐÂY: Thay loadUserInfo() bằng syncGameData()
+    // Đồng bộ nhẹ
     await syncGameData(); 
 
     flightPhase = 'IDLE'; 
