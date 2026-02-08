@@ -49,7 +49,7 @@ const TASKS = [
     { 
         id: 1, 
         name: 'Tham gia Kênh Thông báo', 
-        reward: 25000, 
+        reward: 2500, 
         icon: '📢', 
         type: 'tele', // Đặt loại là tele
         link: 'https://t.me/vienduatin', 
@@ -58,7 +58,7 @@ const TASKS = [
     { 
         id: 2, 
         name: 'Tham gia Nhóm Chat', 
-        reward: 25000, 
+        reward: 2500, 
         icon: '👥', 
         type: 'tele', 
         link: 'https://t.me/BAOAPPMIENPHI22', 
@@ -67,7 +67,7 @@ const TASKS = [
     { 
         id: 3, 
         name: 'Intro Like Channel', 
-        reward: 25000, 
+        reward: 2500, 
         icon: '📢', 
         type: 'tele', // Đặt loại là tele
         link: 'https://t.me/IntroLikeChannel', 
@@ -76,17 +76,17 @@ const TASKS = [
     { 
         id: 4, 
         name: 'Cộng Đồng Intro Like', 
-        reward: 25000, 
+        reward: 2500, 
         icon: '👥', 
         type: 'tele', 
         link: 'https://t.me/CongDongIntroLike', 
         channelId: '@CongDongIntroLike' 
     },
-    { id: 5, name: 'Mời 5 bạn bè', reward: 500000, icon: '🤝', type: 'invite', count: 5 },
-    { id: 6, name: 'Mời 10 bạn bè', reward: 1000000, icon: '🤝', type: 'invite', count: 10 },
-    { id: 7, name: 'Mời 20 bạn bè', reward: 2500000, icon: '🤝', type: 'invite', count: 20 },
-    { id: 8, name: 'Mời 50 bạn bè', reward: 7000000, icon: '🤝', type: 'invite', count: 50 },
-    { id: 9, name: 'Mời 100 bạn bè', reward: 15000000, icon: '🤝', type: 'invite', count: 100 },
+    { id: 5, name: 'Mời 5 bạn bè', reward: 50000, icon: '🤝', type: 'invite', count: 5 },
+    { id: 6, name: 'Mời 10 bạn bè', reward: 100000, icon: '🤝', type: 'invite', count: 10 },
+    { id: 7, name: 'Mời 20 bạn bè', reward: 250000, icon: '🤝', type: 'invite', count: 20 },
+    { id: 8, name: 'Mời 50 bạn bè', reward: 700000, icon: '🤝', type: 'invite', count: 50 },
+    { id: 9, name: 'Mời 100 bạn bè', reward: 1500000, icon: '🤝', type: 'invite', count: 100 },
 ];
 
 const TASK_COOLDOWN = 15 * 60 * 1000; // 15 Phút
@@ -1180,7 +1180,7 @@ function renderInvestments() {
             btnHtml = `
                 <button onclick="claimInvestment(${card.id}, this)" class="w-full py-3 bg-gradient-to-b from-emerald-400 to-emerald-600 border-b-4 border-emerald-800 rounded-xl text-white font-black text-sm shadow-lg active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 animate-bounce-slow">
                     <i data-lucide="gift" class="w-5 h-5"></i>
-                    NHẬN +${formatNumber(card.cost + card.profit)}
+                    NHẬN +${formatNumber(card.cost + card.profit)}💰
                 </button>`;
         } 
         // --- TRẠNG THÁI 3: ĐANG CHẠY (Xanh dương) ---
@@ -1205,7 +1205,7 @@ function renderInvestments() {
             
             btnHtml = `
                 <button onclick="buyInvestment(${card.id}, this)" ${!canBuy ? 'disabled' : ''} class="w-full py-3 border-b-4 rounded-xl text-sm font-black shadow-lg active:border-b-0 active:translate-y-1 transition-all ${style}">
-                    ĐẦU TƯ ${formatNumber(card.cost)}
+                    ĐẦU TƯ ${formatNumber(card.cost)}💰
                 </button>`;
         }
 
@@ -1225,7 +1225,7 @@ function renderInvestments() {
                                 <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-md border border-emerald-500/30">
                                     LÃI ${Math.round((card.profit/card.cost)*100)}%
                                 </span>
-                                <span class="text-xs text-slate-400">trong 1h</span>
+                                <span class="text-xs text-slate-400">sau 1h</span>
                             </div>
                         </div>
                     </div>
@@ -1233,7 +1233,7 @@ function renderInvestments() {
                 
                 <div class="flex justify-between items-center bg-slate-900/50 px-3 py-2 rounded-lg mb-4 border border-white/5">
                     <span class="text-xs text-slate-400 font-medium">Lợi nhuận dự kiến</span>
-                    <span class="text-sm text-emerald-400 font-bold font-mono">+${formatNumber(card.profit)}</span>
+                    <span class="text-sm text-emerald-400 font-bold font-mono">+${formatNumber(card.profit)}💰</span>
                 </div>
                 
                 <div class="relative z-10">${btnHtml}</div>
@@ -1386,8 +1386,8 @@ function renderTasks() {
                     <div class="text-left">
                         <div class="font-bold text-sm text-white">${task.name}</div>
                         <div class="flex items-center gap-1 mt-0.5">
-                            <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold">
-                                +${formatNumber(task.reward)}
+                            <span class="text-[10px] bg-blue-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold">
+                                +${formatNumber(task.reward)}💎
                             </span>
                         </div>
                     </div>
@@ -1432,8 +1432,8 @@ function renderAdsgramTaskBlock(containerId) {
         <div slot="description" class="text-[10px] text-gray-400">Tham gia kênh để nhận thưởng lớn</div>
         
         <div slot="reward" class="flex items-center gap-1 mt-1">
-             <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
-                +25,000
+             <span class="text-[10px] bg-blue-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
+                +2,5000💎
             </span>
         </div>
 
@@ -1467,7 +1467,7 @@ if (!window.__adsgramTaskListenerAdded) {
 
     window.addEventListener('reward', (e) => {
         if (e.target?.tagName === 'ADSGRAM-TASK') {
-            showNotification('Đã nhận +25,000 xu', 'success');
+            showNotification('Đã nhận +2,500 kim cương', 'success');
             // User ăn xong -> Phạt chờ 15p
             startCooldown();
         }
@@ -1543,7 +1543,7 @@ window.checkTaskAction = async () => {
         }
 
         // 3. THÀNH CÔNG
-        showNotification(`Đã nhận +${formatNumber(currentSelectedTask.reward)} xu`, 'success');
+        showNotification(`Đã nhận +${formatNumber(currentSelectedTask.reward)} kim cương`, 'success');
         if (!state.completedTasks.includes(currentSelectedTask.id)) {
             state.completedTasks.push(currentSelectedTask.id);
         }
@@ -1583,10 +1583,6 @@ function renderDaily() {
         const isCurrent = day === state.dailyStreak + 1;
 
         // ================= ICON THEO GIÁ TRỊ =================
-        let rewardIcon = '💰';
-        if (reward === 10000) rewardIcon = '💎';
-        if (reward === 30000) rewardIcon = '👑';
-
         let className =
             'flex-shrink-0 w-16 h-20 rounded-xl flex flex-col items-center justify-center border relative ';
 
@@ -1608,7 +1604,7 @@ function renderDaily() {
                 <span class="text-[9px] text-gray-400 mb-1">Ngày ${day}</span>
 
                 <div class="mb-1 text-2xl">
-                    ${rewardIcon}
+                    💎
                 </div>
 
 
@@ -1699,7 +1695,7 @@ function renderFriends() {
 
     // 🔥 SỬA: Lấy trực tiếp từ biến số
     inviteCountEl.innerText = state.inviteCount;
-    inviteEarnEl.innerText  = `${formatNumber(state.totalInviteDiamond)} 💎`;
+    inviteEarnEl.innerText  = `${formatNumber(state.totalInviteDiamond)}💎`;
     inviteEarnEl.className  = "text-2xl font-black text-indigo-400";
 
     const inviteLink = `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
@@ -1922,7 +1918,7 @@ function renderBoosts(force = false) {
         "
         ${state.diamond < energyCost ? 'disabled' : ''}
         class="${state.diamond >= energyCost ? btnStyle : btnDisabled}">
-            ${formatNumber(energyCost)} 💎
+            ${formatNumber(energyCost)}💎
         </button>`
     );
 
@@ -1931,7 +1927,7 @@ function renderBoosts(force = false) {
         '<i data-lucide="zap" class="w-5 h-5"></i>',
         'yellow',
         'Mua năng lượng',
-        '100 💎 = 1000 ⚡ (Min 100)',
+        '100💎 = 1000⚡ (Min 100)',
         `<button onclick="toggleBoostPanel('buy_energy')" class="${btnStyle}">Mua</button>`,
         `
         <input
@@ -1959,7 +1955,7 @@ function renderBoosts(force = false) {
         '<i data-lucide="gem" class="w-5 h-5"></i>',
         'cyan',
         'Đổi vàng → kim cương',
-        '1000 💰 = 100 💎 (Min 1000)',
+        '1000💰 = 100💎 (Min 1000)',
         `<button onclick="toggleBoostPanel('gold_to_diamond')" class="${btnStyle}">Đổi</button>`,
         `
         <input
@@ -2042,7 +2038,7 @@ window.updateBuyEnergyPreview = () => {
         return;
     }
 
-    btn.innerText = `Mua (${diamondsNeed} 💎)`;
+    btn.innerText = `Mua (${diamondsNeed}💎)`;
     btn.disabled = false;
 };
 
@@ -2066,7 +2062,7 @@ window.updateGoldToDiamondPreview = () => {
         return;
     }
 
-    btn.innerText = `Đổi (${gold} 💎)`;
+    btn.innerText = `Đổi (${gold}💎)`;
     btn.disabled = false;
 };
 
@@ -2314,4 +2310,108 @@ window.onload = () => {
 
     // 🔥 LOGIN + SYNC USER
     initApp();
+};
+
+// =============================================================================
+// REGION 14: CODE DƯ THỪA / TRÙNG LẶP (ĐÃ TÁCH RIÊNG THEO YÊU CẦU)
+// =============================================================================
+// [GIẢI THÍCH]: Những hàm dưới đây đã tồn tại ở REGION 12 (phiên bản chính thức).
+// Do code gốc copy paste 2 lần nên tôi dời bản sao cũ xuống đây để không xoá code.
+// Các hàm này sẽ bị override bởi các hàm cùng tên ở trên.
+
+// 2. Logic Preview Mua Năng Lượng (Bản sao cũ)
+window.updateBuyEnergyPreview = () => {
+    const input = document.getElementById('buy-energy-input');
+    const btn = document.getElementById('buy-energy-confirm');
+    if (!input || !btn) return;
+
+    const diamondSpend = parseInt(input.value, 10);
+
+    // Min 100 KC
+    if (!diamondSpend || diamondSpend < 100) {
+        btn.innerText = 'Min 100 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (diamondSpend > state.diamond) {
+        btn.innerText = 'Thiếu 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (KC / 100) * 1000
+    const energyGet = Math.floor(diamondSpend / 100) * 1000;
+
+    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
+    btn.disabled = false;
+};
+
+// 3. Logic Preview Đổi Vàng (Bản sao cũ)
+window.updateGoldToDiamondPreview = () => {
+    const input = document.getElementById('gold-to-diamond-input');
+    const btn = document.getElementById('gold-to-diamond-confirm');
+    if (!input || !btn) return;
+
+    const goldSpend = parseInt(input.value, 10);
+
+    // Min 1000 Vàng
+    if (!goldSpend || goldSpend < 1000) {
+        btn.innerText = 'Min 1000 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (goldSpend > state.balance) {
+        btn.innerText = 'Thiếu 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (Vàng / 1000) * 100
+    const diamondGet = Math.floor(goldSpend / 1000) * 100;
+
+    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
+    btn.disabled = false;
+};
+
+// Hàm Apply Boost (Bản sao cũ)
+window.applyBoost = async (type, btn) => {
+    if (!btn || btn.disabled) return;
+    setLoading(btn, true);
+
+    try {
+        const payload = { type };
+
+        // ✅ GỬI AMOUNT
+        if (type === 'buy_energy' || type === 'gold_to_diamond') {
+            payload.amount = parseInt(btn.dataset.amount || 0);
+        }
+
+        const res = await fetch(`${API_BASE}/apply`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Thao tác thất bại');
+
+        showNotification('Thành công!', 'success');
+
+        await loadUserInfo({ silent: true });
+
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+
+        renderBoosts(true);
+        updateUI();
+
+    } catch (e) {
+        showNotification(e.message || 'Lỗi', 'error');
+    } finally {
+        setLoading(btn, false);
+    }
 };
