@@ -316,6 +316,7 @@ let socialDataCache = null; // 💾 Mới: Cache để tránh gọi API xã hộ
 // Cập nhật lại Object State
 let state = {
     balance: 0,
+    diamond: 0,
     totalEarned: 0,
     energy: 1000,
     baseMaxEnergy: 1000,
@@ -428,7 +429,11 @@ function startLoops() {
 }
 function updateUI() {
     animateBalance(state.balance);
-
+    const diamondEl = document.getElementById('diamond-display');
+    if (diamondEl) {
+        // formatNumber giúp hiển thị đẹp (ví dụ 1,000 thay vì 1000)
+        diamondEl.innerText = formatNumber(state.diamond || 0); 
+    }
     // ===== LEVEL TỪ SERVER =====
     const levelIdx = Math.max(0, Math.min(
         LEVEL_THRESHOLDS.length - 1,
@@ -2011,6 +2016,7 @@ async function loadUserInfo({ silent = false } = {}) {
 
         // ===== CẬP NHẬT STATE TỪ SERVER (CORE DATA) =====
         state.balance = data.balance ?? 0;
+        state.diamond = data.diamond ?? 0;
         state.level = data.level ?? 1;
         state.exp = data.exp ?? 0;
 
