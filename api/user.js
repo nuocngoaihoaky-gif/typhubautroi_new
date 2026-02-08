@@ -80,7 +80,7 @@ export default async function handler(req, res) {
                 currentStreak = 0;
             }
 
-            // 🔥 TÍNH TOÁN TRẠNG THÁI (QUAN TRỌNG ĐỂ NÚT MỜ ĐI)
+            // 🔥 TÍNH TOÁN TRẠNG THÁI
             const isClaimedToday = (lastDate === todayStr);
 
             return res.status(200).json({
@@ -98,6 +98,7 @@ export default async function handler(req, res) {
                 level: firestoreData.level || 1,
                 exp: firestoreData.exp || 0,
                 multitapLevel: firestoreData.multitapLevel || 1,
+                tapValue: firestoreData.tapValue || 1, // <--- 🔥 ĐÃ THÊM TAP VALUE
                 energyLimitLevel: firestoreData.energyLimitLevel || 1,
                 investments: firestoreData.investments || {},
                 bank_info: firestoreData.bank_info || null,
@@ -111,7 +112,7 @@ export default async function handler(req, res) {
                 
                 // Daily Checkin
                 dailyStreak: currentStreak,
-                isClaimedToday: isClaimedToday, // <--- PHẢI CÓ CÁI NÀY NÚT MỚI TẮT
+                isClaimedToday: isClaimedToday,
 
                 server_time: now
             });
@@ -158,7 +159,7 @@ export default async function handler(req, res) {
             inviteCount: 0, totalInviteDiamond: 0, completedTasks: [], withdrawHistory: [],
             dailyStreak: 0, 
             
-            isClaimedToday: false, // User mới chắc chắn chưa nhận
+            isClaimedToday: false,
 
             ...newWalletData,
             server_time: now
