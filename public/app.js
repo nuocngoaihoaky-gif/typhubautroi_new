@@ -1862,15 +1862,16 @@ document.getElementById('withdraw-amount').addEventListener('input', (e) => {
     document.getElementById('withdraw-rate').innerText = `Quy đổi: ${formatNumber(val * 0.001)} VNĐ`;
 });
 
+// Thay thế hàm renderBoosts cũ bằng hàm này
 function renderBoosts(force = false) {
-    // ⛔ ĐANG NHẬP → KHÔNG RENDER LẠI
     if (isEditingBoostInput && !force) return;
 
     const container = document.getElementById('boost-list');
     if (!container) return;
 
-    const multitapCost = 5000 * Math.pow(2, state.multitapLevel - 1);
-    const energyCost   = 5000 * Math.pow(2, state.energyLimitLevel - 1);
+    // 🔥 GIÁ MỚI: Dùng Kim Cương (Base 500)
+    const multitapCost = 500 * Math.pow(2, state.multitapLevel - 1);
+    const energyCost   = 500 * Math.pow(2, state.energyLimitLevel - 1);
 
     const btnStyle =
         "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all";
@@ -1902,7 +1903,8 @@ function renderBoosts(force = false) {
 
     let html = '';
 
-    // ================= TURBO =================
+    // ================= TURBO (DÙNG KIM CƯƠNG) =================
+    // Check state.diamond thay vì state.balance
     html += row(
         '<i data-lucide="chevrons-up" class="w-5 h-5"></i>',
         'blue',
@@ -1913,13 +1915,14 @@ function renderBoosts(force = false) {
             isEditingBoostInput = false;
             applyBoost('multitap', this)
         "
-        ${state.balance < multitapCost ? 'disabled' : ''}
-        class="${state.balance >= multitapCost ? btnStyle : btnDisabled}">
-            ${formatNumber(multitapCost)} 💰
+        ${state.diamond < multitapCost ? 'disabled' : ''}
+        class="${state.diamond >= multitapCost ? btnStyle : btnDisabled}">
+            ${formatNumber(multitapCost)} 💎
         </button>`
     );
 
-    // ================= BÌNH XĂNG =================
+    // ================= BÌNH XĂNG (DÙNG KIM CƯƠNG) =================
+    // Check state.diamond thay vì state.balance
     html += row(
         '<i data-lucide="battery-charging" class="w-5 h-5"></i>',
         'purple',
@@ -1930,27 +1933,25 @@ function renderBoosts(force = false) {
             isEditingBoostInput = false;
             applyBoost('limit', this)
         "
-        ${state.balance < energyCost ? 'disabled' : ''}
-        class="${state.balance >= energyCost ? btnStyle : btnDisabled}">
-            ${formatNumber(energyCost)} 💰
+        ${state.diamond < energyCost ? 'disabled' : ''}
+        class="${state.diamond >= energyCost ? btnStyle : btnDisabled}">
+            ${formatNumber(energyCost)} 💎
         </button>`
     );
 
-    // ================= 💎 MUA NĂNG LƯỢNG =================
+    // ================= 💎 MUA NĂNG LƯỢNG (GIỮ NGUYÊN) =================
     html += row(
         '<i data-lucide="zap" class="w-5 h-5"></i>',
         'yellow',
         'Mua năng lượng',
-        'Kim cương → năng lượng',
-        `<button onclick="toggleBoostPanel('buy_energy')" class="${btnStyle}">
-            Mua
-        </button>`,
+        '100 💎 = 1000 ⚡ (Min 100)',
+        `<button onclick="toggleBoostPanel('buy_energy')" class="${btnStyle}">Mua</button>`,
         `
         <input
             id="buy-energy-input"
             type="number"
-            min="1"
-            placeholder="Nhập số năng lượng"
+            min="100"
+            placeholder="Nhập số Kim Cương muốn chi"
             class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
             onfocus="isEditingBoostInput = true"
             onblur="isEditingBoostInput = false"
@@ -1960,27 +1961,25 @@ function renderBoosts(force = false) {
             onclick="confirmBuyEnergy(this)"
             class="${btnStyle} w-full"
             disabled>
-            💎 0
+            Nhận ⚡ 0
         </button>
         `,
         'buy_energy'
     );
 
-    // ================= 🪙 ĐỔI VÀNG → KC =================
+    // 🔥 SỬA PHẦN ĐỔI VÀNG (Input là Vàng)
     html += row(
         '<i data-lucide="gem" class="w-5 h-5"></i>',
         'cyan',
         'Đổi vàng → kim cương',
-        'Tỷ lệ 1 💰 = 1 💎',
-        `<button onclick="toggleBoostPanel('gold_to_diamond')" class="${btnStyle}">
-            Đổi
-        </button>`,
+        '1000 💰 = 100 💎 (Min 1000)',
+        `<button onclick="toggleBoostPanel('gold_to_diamond')" class="${btnStyle}">Đổi</button>`,
         `
         <input
             id="gold-to-diamond-input"
             type="number"
-            min="1"
-            placeholder="Nhập số vàng"
+            min="1000"
+            placeholder="Nhập số Vàng muốn đổi"
             class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
             onfocus="isEditingBoostInput = true"
             onblur="isEditingBoostInput = false"
@@ -1990,7 +1989,7 @@ function renderBoosts(force = false) {
             onclick="confirmGoldToDiamond(this)"
             class="${btnStyle} w-full"
             disabled>
-            Đổi
+            Nhận 💎 0
         </button>
         `,
         'gold_to_diamond'
@@ -1999,6 +1998,121 @@ function renderBoosts(force = false) {
     container.innerHTML = html;
     lucide.createIcons();
 }
+
+// 2. Logic Preview Mua Năng Lượng
+window.updateBuyEnergyPreview = () => {
+    const input = document.getElementById('buy-energy-input');
+    const btn = document.getElementById('buy-energy-confirm');
+    if (!input || !btn) return;
+
+    const diamondSpend = parseInt(input.value, 10);
+
+    // Min 100 KC
+    if (!diamondSpend || diamondSpend < 100) {
+        btn.innerText = 'Min 100 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (diamondSpend > state.diamond) {
+        btn.innerText = 'Thiếu 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (KC / 100) * 1000
+    const energyGet = Math.floor(diamondSpend / 100) * 1000;
+
+    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
+    btn.disabled = false;
+};
+
+// 3. Logic Preview Đổi Vàng
+window.updateGoldToDiamondPreview = () => {
+    const input = document.getElementById('gold-to-diamond-input');
+    const btn = document.getElementById('gold-to-diamond-confirm');
+    if (!input || !btn) return;
+
+    const goldSpend = parseInt(input.value, 10);
+
+    // Min 1000 Vàng
+    if (!goldSpend || goldSpend < 1000) {
+        btn.innerText = 'Min 1000 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (goldSpend > state.balance) {
+        btn.innerText = 'Thiếu 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (Vàng / 1000) * 100
+    const diamondGet = Math.floor(goldSpend / 1000) * 100;
+
+    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
+    btn.disabled = false;
+};
+// 2. Logic Preview Mua Năng Lượng
+window.updateBuyEnergyPreview = () => {
+    const input = document.getElementById('buy-energy-input');
+    const btn = document.getElementById('buy-energy-confirm');
+    if (!input || !btn) return;
+
+    const diamondSpend = parseInt(input.value, 10);
+
+    // Min 100 KC
+    if (!diamondSpend || diamondSpend < 100) {
+        btn.innerText = 'Min 100 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (diamondSpend > state.diamond) {
+        btn.innerText = 'Thiếu 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (KC / 100) * 1000
+    const energyGet = Math.floor(diamondSpend / 100) * 1000;
+
+    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
+    btn.disabled = false;
+};
+
+// 3. Logic Preview Đổi Vàng
+window.updateGoldToDiamondPreview = () => {
+    const input = document.getElementById('gold-to-diamond-input');
+    const btn = document.getElementById('gold-to-diamond-confirm');
+    if (!input || !btn) return;
+
+    const goldSpend = parseInt(input.value, 10);
+
+    // Min 1000 Vàng
+    if (!goldSpend || goldSpend < 1000) {
+        btn.innerText = 'Min 1000 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (goldSpend > state.balance) {
+        btn.innerText = 'Thiếu 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (Vàng / 1000) * 100
+    const diamondGet = Math.floor(goldSpend / 1000) * 100;
+
+    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
+    btn.disabled = false;
+};
 
 window.toggleBoostPanel = (key) => {
     if (openedBoostPanel === key) {
