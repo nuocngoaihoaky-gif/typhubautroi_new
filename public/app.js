@@ -1180,7 +1180,7 @@ function renderInvestments() {
             btnHtml = `
                 <button onclick="claimInvestment(${card.id}, this)" class="w-full py-3 bg-gradient-to-b from-emerald-400 to-emerald-600 border-b-4 border-emerald-800 rounded-xl text-white font-black text-sm shadow-lg active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 animate-bounce-slow">
                     <i data-lucide="gift" class="w-5 h-5"></i>
-                    NHẬN +${formatNumber(card.cost + card.profit)}
+                    NHẬN +${formatNumber(card.cost + card.profit)}💰
                 </button>`;
         } 
         // --- TRẠNG THÁI 3: ĐANG CHẠY (Xanh dương) ---
@@ -1205,7 +1205,7 @@ function renderInvestments() {
             
             btnHtml = `
                 <button onclick="buyInvestment(${card.id}, this)" ${!canBuy ? 'disabled' : ''} class="w-full py-3 border-b-4 rounded-xl text-sm font-black shadow-lg active:border-b-0 active:translate-y-1 transition-all ${style}">
-                    ĐẦU TƯ ${formatNumber(card.cost)}
+                    ĐẦU TƯ ${formatNumber(card.cost)}💰
                 </button>`;
         }
 
@@ -1225,7 +1225,7 @@ function renderInvestments() {
                                 <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-md border border-emerald-500/30">
                                     LÃI ${Math.round((card.profit/card.cost)*100)}%
                                 </span>
-                                <span class="text-xs text-slate-400">trong 1h</span>
+                                <span class="text-xs text-slate-400">sau 1h</span>
                             </div>
                         </div>
                     </div>
@@ -1387,7 +1387,7 @@ function renderTasks() {
                         <div class="font-bold text-sm text-white">${task.name}</div>
                         <div class="flex items-center gap-1 mt-0.5">
                             <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold">
-                                +${formatNumber(task.reward)}
+                                +${formatNumber(task.reward)}💎
                             </span>
                         </div>
                     </div>
@@ -1433,7 +1433,7 @@ function renderAdsgramTaskBlock(containerId) {
         
         <div slot="reward" class="flex items-center gap-1 mt-1">
              <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
-                +25,000
+                +2,500💎
             </span>
         </div>
 
