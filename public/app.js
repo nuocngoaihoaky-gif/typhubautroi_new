@@ -1183,13 +1183,14 @@ function renderInvestments() {
     if(!container) return;
     container.innerHTML = '';
     
-    const currentLevelIdx = LEVEL_THRESHOLDS.findIndex((l, i) => {
-        const next = LEVEL_THRESHOLDS[i + 1];
-        return state.totalEarned >= l.threshold && (!next || state.totalEarned < next.threshold);
-    });
+    // 🔥 SỬA: Dùng trực tiếp Level từ Server để check mở khóa
+    // Level 1 = Index 0, Level 2 = Index 1...
+    const currentLevelIdx = Math.max(0, state.level - 1);
 
     INVESTMENT_CARDS.forEach(card => {
+        // So sánh: Index Level hiện tại < Yêu cầu của gói -> Khóa
         const isLocked = currentLevelIdx < card.levelReq;
+        
         const finishTime = state.investments[card.id];
         const isInvested = !!finishTime;
         const isReady = isInvested && Date.now() >= finishTime;
@@ -1205,7 +1206,6 @@ function renderInvestments() {
                 </div>`;
         } 
         // --- TRẠNG THÁI 2: THU HOẠCH (Xanh lá rực rỡ) ---
-        // Thêm tham số 'this' vào hàm click
         else if (isReady) {
             btnHtml = `
                 <button onclick="claimInvestment(${card.id}, this)" class="w-full py-3 bg-gradient-to-b from-emerald-400 to-emerald-600 border-b-4 border-emerald-800 rounded-xl text-white font-black text-sm shadow-lg active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 animate-bounce-slow">
@@ -1226,7 +1226,6 @@ function renderInvestments() {
                 </div>`;
         } 
         // --- TRẠNG THÁI 4: MUA (Vàng Cam) ---
-        // Thêm tham số 'this' vào hàm click
         else {
             const canBuy = state.balance >= card.cost;
             const style = canBuy 
@@ -1239,7 +1238,7 @@ function renderInvestments() {
                 </button>`;
         }
 
-        // Layout Card: Nổi khối, sáng sủa hơn
+        // Layout Card
         const html = `
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-700 shadow-xl relative group overflow-hidden mb-3">
                 <div class="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -1273,7 +1272,6 @@ function renderInvestments() {
     });
     lucide.createIcons();
 }
-
 // =============================================================================
 // 🔥 SMART INVESTMENTS (TIẾT KIỆM READ - CẬP NHẬT THỦ CÔNG)
 // =============================================================================
