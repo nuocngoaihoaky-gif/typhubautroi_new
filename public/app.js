@@ -2307,6 +2307,7 @@ async function loadAuxData() {
 }
 
 // Khởi tạo App
+// Khởi tạo App
 async function initApp() {
     try {
         const user = tg.initDataUnsafe?.user;
@@ -2314,27 +2315,48 @@ async function initApp() {
             currentUserUID = user.id;
             let displayName = user.first_name || 'Phi công';
             if (user.last_name) displayName += ' ' + user.last_name;
+            
+            // Cập nhật tên nếu có element (phòng hờ)
             const nameEl = document.getElementById('username');
             if (nameEl) nameEl.innerText = displayName;
         }
 
-        // 🔥 GỌI ALL API NGAY TỪ ĐẦU
+        // 🔥 QUAN TRỌNG: await ở đây nghĩa là "Chờ xong xuôi mới đi tiếp"
         await Promise.all([
-            loadUserInfo(),
-            loadAuxData()
+            loadUserInfo(), // Gọi API user
+            loadAuxData()   // Gọi API social
         ]);
 
-        // ✅ ✅ ✅ DÒNG CẦN THÊM — CHỈ 1 DÒNG NÀY
+        // Render tab bạn bè sau khi có data
         renderFriends();
 
     } catch (e) {
         console.error(e);
-        tg.showAlert("⚠️ Không thể đăng nhập");
+        tg.showAlert("⚠️ Lỗi kết nối máy chủ. Vui lòng thử lại!");
     } finally {
+        // ============================================================
+        // 🟢 KHI API ĐÃ TRẢ VỀ (XONG HOẶC LỖI) THÌ CHẠY VÀO ĐÂY
+        // ============================================================
+        
+        // 1. Dừng cái vòng lặp giả lập % bên HTML
+        if (window.stopLoadingSim) window.stopLoadingSim();
+
+        // 2. Kéo thanh loading lên 100% cho người dùng sướng mắt
+        const bar = document.getElementById('loading-progress');
+        const pct = document.getElementById('loading-percent');
+        const txt = document.getElementById('loading-text');
+
+        if (bar) bar.style.width = '100%';
+        if (pct) pct.innerText = '100%';
+        if (txt) txt.innerText = 'Sẵn sàng cất cánh!';
+
+        // 3. Đợi 300ms cho user nhìn thấy 100% rồi mới ẩn màn hình
         const loader = document.getElementById('loading-screen');
         if (loader) {
-            loader.style.opacity = 0;
-            setTimeout(() => loader.remove(), 500);
+            setTimeout(() => {
+                loader.style.opacity = '0';     // Làm mờ
+                setTimeout(() => loader.remove(), 500); // Xóa khỏi DOM
+            }, 300);
         }
     }
 }
