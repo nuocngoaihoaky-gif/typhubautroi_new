@@ -35,7 +35,6 @@
             transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
         }
 
-        /* Ảnh Logo Game */
         .loading-logo-container {
             width: 90%;
             max-width: 320px;
@@ -57,7 +56,6 @@
             50% { transform: translateY(-10px); }
         }
 
-        /* Thanh Loading Sọc Màu */
         .loading-bar-bg {
             width: 75%;
             max-width: 280px;
@@ -75,15 +73,7 @@
             width: 0%;
             border-radius: 20px;
             transition: width 0.1s linear;
-            
-            /* Hiệu ứng sọc chéo sen kẽ */
-            background: repeating-linear-gradient(
-                45deg,
-                #3b82f6,
-                #3b82f6 10px,
-                #60a5fa 10px,
-                #60a5fa 20px
-            );
+            background: repeating-linear-gradient(45deg, #3b82f6, #3b82f6 10px, #60a5fa 10px, #60a5fa 20px);
             background-size: 200% 100%;
             animation: stripe-move 1s linear infinite;
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
@@ -91,10 +81,9 @@
 
         @keyframes stripe-move {
             0% { background-position: 0 0; }
-            100% { background-position: 28px 0; } /* Khớp với độ rộng sọc */
+            100% { background-position: 28px 0; }
         }
 
-        /* Text % và Trạng thái */
         .loading-info {
             margin-top: 12px;
             display: flex;
@@ -148,28 +137,26 @@
         <div class="pt-4 px-4 pb-2 z-20 relative flex-shrink-0">
             <div class="flex items-center mb-4 justify-between">
                 
-                <div class="flex items-center gap-3 bg-[#2d2d3e]/60 py-1.5 px-2 pr-4 rounded-full border border-white/5 backdrop-blur-md shadow-lg">
-                    <div class="relative">
+                <div class="flex items-center gap-3 bg-[#2d2d3e]/80 py-1.5 px-2 pr-4 rounded-full border border-white/10 backdrop-blur-xl shadow-lg max-w-[60%]">
+                    <div class="relative flex-shrink-0">
                         <img id="header-avatar" 
-                             src="https://ui-avatars.com/api/?name=Phi+Cong&background=3b82f6&color=fff&size=128" 
-                             class="w-10 h-10 rounded-full border-2 border-white/10 object-cover shadow-inner">
-                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#2d2d3e] rounded-full animate-pulse"></div>
+                             src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&size=128" 
+                             class="w-9 h-9 rounded-full border border-white/20 object-cover shadow-sm">
+                        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#2d2d3e] rounded-full"></div>
                     </div>
-                    <div class="flex flex-col">
-                        <span id="header-username" class="text-sm font-bold text-white leading-none mb-0.5 max-w-[120px] truncate">Đang tải...</span>
-                        <div class="flex items-center gap-1">
-                            <span class="text-[9px] text-gray-400 font-mono bg-black/30 px-1.5 rounded" id="header-userid">ID: ---</span>
-                        </div>
-                    </div>
+                    
+                    <span id="header-username" class="text-sm font-bold text-white truncate max-w-[120px]">
+                        Đang tải...
+                    </span>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <div id="mini-diamond" class="items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 flex shadow-sm">
-                        <span class="text-lg drop-shadow-md">💎</span>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <div id="mini-diamond" class="items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 flex shadow-sm">
+                        <span class="text-base drop-shadow-md">💎</span>
                         <span id="mini-diamond-text" class="text-sm font-bold text-blue-400">0</span>
                     </div>
-                    <div id="mini-balance" class="hidden items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
-                        <span class="text-lg drop-shadow-md">💰</span>
+                    <div id="mini-balance" class="hidden items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
+                        <span class="text-base drop-shadow-md">💰</span>
                         <span id="mini-balance-text" class="text-sm font-bold text-yellow-400">0</span>
                     </div>
                 </div>
@@ -400,27 +387,23 @@
             // Khi App.js load xong (nó sẽ gọi hàm ẩn loading), interval này sẽ bị clear
             window.stopLoadingSim = () => clearInterval(intv);
 
-            // 🔥 LOGIC HIỂN THỊ AVATAR TELEGRAM
+            // 🔥 LOGIC HEADER MỚI (Lấy Avatar & Tên)
             const tg = window.Telegram.WebApp;
             const user = tg.initDataUnsafe?.user;
+            
             if (user) {
                 const avatarEl = document.getElementById('header-avatar');
                 const nameEl = document.getElementById('header-username');
-                const idEl = document.getElementById('header-userid');
 
-                // Tên hiển thị
-                let fullName = user.first_name || '';
-                if (user.last_name) fullName += ' ' + user.last_name;
-                nameEl.innerText = fullName || `Phi công ${user.id}`;
+                // 1. Chỉ lấy Firstname
+                const firstName = user.first_name || 'Phi Công';
+                nameEl.innerText = firstName;
 
-                // ID hiển thị
-                idEl.innerText = `ID: ${user.id}`;
-
-                // Avatar (Nếu có photo_url thì dùng, ko thì dùng UI Avatars)
+                // 2. Avatar (Nếu có photo_url thì dùng, ko thì dùng UI Avatars với firstname)
                 if (user.photo_url) {
                     avatarEl.src = user.photo_url;
                 } else {
-                    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=3b82f6&color=fff&size=128`;
+                    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(firstName)}&background=3b82f6&color=fff&size=128`;
                 }
             }
         });
