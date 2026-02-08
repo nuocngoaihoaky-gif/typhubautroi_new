@@ -1386,7 +1386,7 @@ function renderTasks() {
                     <div class="text-left">
                         <div class="font-bold text-sm text-white">${task.name}</div>
                         <div class="flex items-center gap-1 mt-0.5">
-                            <span class="text-[10px] bg-blue-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold">
+                            <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold">
                                 +${formatNumber(task.reward)}💎
                             </span>
                         </div>
@@ -1432,8 +1432,8 @@ function renderAdsgramTaskBlock(containerId) {
         <div slot="description" class="text-[10px] text-gray-400">Tham gia kênh để nhận thưởng lớn</div>
         
         <div slot="reward" class="flex items-center gap-1 mt-1">
-             <span class="text-[10px] bg-blue-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
-                +2,5000💎
+             <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold translate-x-3.5">
+                +2,500💎
             </span>
         </div>
 
@@ -1900,7 +1900,7 @@ function renderBoosts(force = false) {
         "
         ${state.diamond < multitapCost ? 'disabled' : ''}
         class="${state.diamond >= multitapCost ? btnStyle : btnDisabled}">
-            ${formatNumber(multitapCost)} 💎
+            ${formatNumber(multitapCost)}💎
         </button>`
     );
 
@@ -1944,7 +1944,7 @@ function renderBoosts(force = false) {
             onclick="confirmBuyEnergy(this)"
             class="${btnStyle} w-full"
             disabled>
-            Nhận ⚡ 0
+            Nhận 0⚡
         </button>
         `,
         'buy_energy'
@@ -1972,7 +1972,7 @@ function renderBoosts(force = false) {
             onclick="confirmGoldToDiamond(this)"
             class="${btnStyle} w-full"
             disabled>
-            Nhận 💎 0
+            Nhận 0💎
         </button>
         `,
         'gold_to_diamond'
@@ -2024,7 +2024,7 @@ window.updateBuyEnergyPreview = () => {
     const want = parseInt(input.value, 10);
 
     if (!want || want <= 0) {
-        btn.innerText = '💎 0';
+        btn.innerText = '0💎';
         btn.disabled = true;
         return;
     }
@@ -2329,7 +2329,7 @@ window.updateBuyEnergyPreview = () => {
 
     // Min 100 KC
     if (!diamondSpend || diamondSpend < 100) {
-        btn.innerText = 'Min 100 💎';
+        btn.innerText = 'Min 100💎';
         btn.disabled = true;
         return;
     }
@@ -2373,7 +2373,7 @@ window.updateGoldToDiamondPreview = () => {
     // Tính toán: (Vàng / 1000) * 100
     const diamondGet = Math.floor(goldSpend / 1000) * 100;
 
-    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
+    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)}💎)`;
     btn.disabled = false;
 };
 
