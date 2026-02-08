@@ -991,15 +991,14 @@ async function resetGame() {
     btn.className = "w-full py-4 rounded-2xl font-black text-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide border-b-4 bg-gradient-to-b from-blue-500 to-blue-600 border-blue-800 text-white";
     lucide.createIcons();
 
-    // ⏳ Đợi server ổn định (quan trọng để tránh Race Condition nếu Jump vừa xong)
+    // ⏳ Đợi server ổn định
     await new Promise(r => setTimeout(r, 400));
     
-    // ✅ CHỈ GỌI USER INFO 1 LẦN DUY NHẤT Ở ĐÂY
-    await loadUserInfo(); 
+    // 🔥 SỬA Ở ĐÂY: Thay loadUserInfo() bằng syncGameData()
+    await syncGameData(); 
 
     flightPhase = 'IDLE'; 
 }
-
 // =============================================================================
 // REGION 6: MAIN UI LOOP & UPDATE
 // =============================================================================
@@ -1328,7 +1327,7 @@ window.claimInvestment = async (id, btn) => {
 };
 
 // =============================================================================
-// REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ CẬP NHẬT TASK #0
+// REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ UPDATE THEO YÊU CẦU
 // =============================================================================
 
 function renderTasks() {
@@ -1339,22 +1338,21 @@ function renderTasks() {
     container.innerHTML = '';
     
     // ============================================================
-    // A. CHUẨN BỊ HTML CHO TASK #0 (TIẾP TẾ)
+    // A. CHUẨN BỊ HTML CHO TASK #0 (TIẾP TẾ - NHẬN KIM CƯƠNG)
     // ============================================================
     const now = getNow();
     const refillCooldown = (state.nextRefillAt || 0) - now;
     const isReady = refillCooldown <= 0;
     
-    // Phần thưởng = Max Năng Lượng hiện tại
-    const reward0 = state.baseMaxEnergy || 1000;
+    // 🔥 TỶ GIÁ MỚI: 1/10 MAX NĂNG LƯỢNG (Vd: 1000 Energy -> 100 Kim Cương)
+    const reward0 = Math.floor((state.baseMaxEnergy || 1000) / 10);
 
     let task0Html = '';
     
     if (isReady) {
-        // --- TRẠNG THÁI: SẴN SÀNG (Màu sáng, Nút bấm được) ---
+        // --- TRẠNG THÁI: SẴN SÀNG (ĐÃ BỎ VIỀN XANH & SHADOW) ---
         task0Html = `
-            <div class="w-full flex items-center justify-between p-4 rounded-xl border border-blue-500/50 bg-[#272738] mb-3 shadow-[0_0_15px_rgba(59,130,246,0.15)] relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-xl -mr-5 -mt-5"></div>
+            <div class="w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#272738] mb-3 relative overflow-hidden">
                 <div class="flex items-center gap-4 relative z-10">
                     <div class="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center text-xl shadow-inner border border-blue-500/30">
                         ⚡
@@ -1379,7 +1377,6 @@ function renderTasks() {
         `;
     } else {
         // --- TRẠNG THÁI: ĐANG HỒI (Màu tối, Nút Timer) ---
-        // Sau khi làm xong nó sẽ hiện cái này 👇
         const mins = Math.ceil(refillCooldown / 60000);
         task0Html = `
             <div class="w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#1c1c1e] mb-3 opacity-60">
@@ -1442,11 +1439,10 @@ function renderTasks() {
     // C. GỘP HTML VÀ RENDER
     // ============================================================
     
-    // 1. Gán HTML Task 0 + Task thường vào container trước
+    // 1. Gán HTML: Task 0 + Task thường vào container trước
     container.innerHTML = task0Html + otherTasksHtml;
     
-    // 2. Sau đó mới gọi hàm render Adsgram
-    // Hàm này dùng insertBefore(firstChild), nên nó sẽ chèn Adsgram LÊN TRÊN ĐẦU Task #0
+    // 2. Sau đó chèn Adsgram vào ĐẦU TIÊN (trên Task 0)
     renderAdsgramTaskBlock('tasks-list');
     
     lucide.createIcons();
@@ -1455,7 +1451,6 @@ function renderTasks() {
 window.claimEnergyTask = async (btn) => {
     if (!btn || btn.disabled) return;
     
-    // 1. Xem QC trước
     try {
         setLoading(btn, true);
         await showEnergyAd(); 
@@ -1465,25 +1460,28 @@ window.claimEnergyTask = async (btn) => {
         return;
     }
 
-    // 2. Xem xong -> Gọi Server nhận thưởng
     try {
-        // Gọi API 'apply' với type 'energy'
-        // Server sẽ: Check thời gian -> Cộng kim cương (bằng maxEnergy) -> Reset cooldown 15p
         const res = await fetch(`${API_BASE}/apply`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ type: 'energy' }) // Backend đã sửa để 'energy' nhận Kim Cương
+            body: JSON.stringify({ type: 'energy' })
         });
 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Lỗi nhận thưởng');
 
-        showNotification(`Nhận thành công +${formatNumber(state.baseMaxEnergy)}💎`, 'success');
+        const reward = data.reward || Math.floor((state.baseMaxEnergy || 1000) / 10);
+        showNotification(`Nhận thành công +${formatNumber(reward)}💎`, 'success');
         
-        // 3. Sync lại data (lấy tiền và thời gian chờ mới)
-        await loadUserInfo({ silent: true });
+        // 🔥 SỬA Ở ĐÂY: Dùng syncGameData() cho nhẹ
+        await syncGameData();
         
-        // Vẽ lại danh sách nhiệm vụ để nút chuyển sang trạng thái "Chờ"
+        // Riêng cái này cần cập nhật lại thời gian hồi chiêu nextRefillAt
+        // Vì api/sync.js không trả về nextRefillAt, nên ta tự tính local hoặc
+        // nếu api apply trả về thì dùng luôn. 
+        // Cách đơn giản nhất: Tự cộng 15 phút vào state để UI đếm ngược ngay
+        state.nextRefillAt = Date.now() + (15 * 60 * 1000); 
+        
         renderTasks();
 
     } catch (e) {
@@ -1548,8 +1546,8 @@ function renderAdsgramTaskBlock(containerId) {
             <div slot="description" class="text-[10px] text-gray-400">Tham gia kênh để nhận thưởng lớn</div>
             
             <div slot="reward" class="flex items-center gap-1 mt-1">
-                 <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
-                    +25,000
+                 <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold translate-x-3.5">
+                    +2,500💎
                 </span>
             </div>
 
@@ -2211,8 +2209,6 @@ window.applyBoost = async (type, btn) => {
 
     try {
         const payload = { type };
-
-        // ✅ GỬI AMOUNT
         if (type === 'buy_energy' || type === 'gold_to_diamond') {
             payload.amount = parseInt(btn.dataset.amount || 0);
         }
@@ -2228,7 +2224,18 @@ window.applyBoost = async (type, btn) => {
 
         showNotification('Thành công!', 'success');
 
-        await loadUserInfo({ silent: true });
+        // 🔥 SỬA Ở ĐÂY: Dùng syncGameData()
+        await syncGameData();
+
+        // Nếu là nâng cấp Level (multitap/limit), ta cần tự tăng level local để UI cập nhật giá
+        // Vì api/sync không trả về level.
+        if (type === 'multitap') {
+            state.multitapLevel++;
+            state.tapValue++;
+        } else if (type === 'limit') {
+            state.energyLimitLevel++;
+            state.baseMaxEnergy += 1000;
+        }
 
         openedBoostPanel = null;
         isEditingBoostInput = false;
@@ -2249,7 +2256,6 @@ window.applyBoost = async (type, btn) => {
 
 // Logic chuyển Tab
 async function switchTab(tabName) {
-    // 1. UI Logic (Giữ nguyên)
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).classList.add('active');
     
@@ -2259,7 +2265,6 @@ async function switchTab(tabName) {
     const miniBal = document.getElementById('mini-balance');
     const miniDia = document.getElementById('mini-diamond');
 
-    // HIỆN/ẨN SỐ DƯ TRÊN HEADER
     miniDia.classList.remove('hidden');
     miniDia.classList.add('flex');
 
@@ -2271,19 +2276,12 @@ async function switchTab(tabName) {
         miniBal.classList.add('flex');
     }
     
-    // ============================================================
-    // 🔥 LOGIC MỚI: DÙNG SYNC.JS ĐỂ CẬP NHẬT NHANH
-    // ============================================================
-    
+    // 🔥 SỬA Ở ĐÂY: Chỉ gọi syncGameData khi vào tab Bay
     if (tabName === 'exchange') {
-        // Chỉ gọi sync nhẹ để lấy lại số dư/năng lượng mới nhất
         syncGameData(); 
     }
 
-    // ============================================================
-    // RENDERING (Dữ liệu đã có sẵn trong state từ loadUserInfo)
-    // ============================================================
-    
+    // Các tab khác chỉ render lại từ state có sẵn
     if (tabName === 'mine') renderInvestments();
     if (tabName === 'quests') { renderTasks(); renderDaily(); }
     if (tabName === 'friends') renderFriends();
@@ -2295,30 +2293,30 @@ async function switchTab(tabName) {
 
 // 🔥 HÀM MỚI: ĐỒNG BỘ NHANH (GỌI API/SYNC)
 // Dùng khi chuyển tab hoặc sau khi thực hiện hành động nhỏ
+// 🔥 HÀM ĐỒNG BỘ NHANH (GỌI API/SYNC)
 async function syncGameData() {
     try {
-        const res = await fetch(`${API_BASE}/sync`, { // Bạn cần tạo file api/sync.js tương ứng
-            method: 'POST',
-            headers: getHeaders()
+        // Gọi API sync nhẹ
+        const res = await fetch(`${API_BASE}/sync`, { 
+            method: 'POST', 
+            headers: getHeaders() 
         });
         
         if (!res.ok) return;
         const data = await res.json();
 
-        // Chỉ cập nhật các thông số biến động
-        state.balance = data.balance ?? state.balance;
-        state.diamond = data.diamond ?? state.diamond;
-        state.energy = data.energy ?? state.energy;
-        
-        // Nếu sync trả về cả maxEnergy (do nâng cấp ở thiết bị khác) thì update luôn
-        if (data.baseMaxEnergy) state.baseMaxEnergy = data.baseMaxEnergy;
+        // Chỉ cập nhật các chỉ số biến động
+        if (data.balance !== undefined) state.balance = data.balance;
+        if (data.diamond !== undefined) state.diamond = data.diamond;
+        if (data.energy !== undefined) state.energy = data.energy;
+        if (data.baseMaxEnergy !== undefined) state.baseMaxEnergy = data.baseMaxEnergy;
 
-        updateUI();
+        // Vẽ lại UI các chỉ số này
+        updateUI(); 
     } catch (e) {
         console.warn("Sync error:", e);
     }
 }
-
 // 🔥 HÀM LOAD FULL DATA (GỌI API/USER - CHỈ 1 LẦN)
 async function loadUserInfo({ silent = false } = {}) {
     try {
