@@ -1865,8 +1865,10 @@ function renderBoosts() {
     const isReady = remainingTime <= 0;
     
     // Style chung
-    const upgradeBtnStyle = "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all min-w-[80px]";
-    const disabledBtnStyle = "px-4 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60 min-w-[80px]";
+    const upgradeBtnStyle =
+        "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all min-w-[80px]";
+    const disabledBtnStyle =
+        "px-4 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60 min-w-[80px]";
 
     const createItem = (icon, color, name, desc, actionHtml) => `
         <div class="bg-[#1e1e2e] border border-white/5 p-4 rounded-xl flex items-center justify-between shadow-md mb-3">
@@ -1885,14 +1887,19 @@ function renderBoosts() {
 
     let html = '';
 
-    // 1. Hồi năng lượng (Logic Time)
+    // =========================================================
+    // 1️⃣ NẠP ĐẦY NĂNG LƯỢNG (COOLDOWN)
+    // =========================================================
     let refillBtn, refillDesc;
     
     if (isReady) {
         refillDesc = "Sẵn sàng sử dụng";
-        refillBtn = `<button onclick="applyBoost('energy', this)" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-lg shadow-[0_3px_0_#a16207] active:shadow-none active:translate-y-[3px] transition-all min-w-[80px]">Nạp đầy</button>`;
+        refillBtn = `
+            <button onclick="applyBoost('energy', this)"
+                class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-lg shadow-[0_3px_0_#a16207] active:shadow-none active:translate-y-[3px] transition-all min-w-[80px]">
+                Nạp đầy
+            </button>`;
     } else {
-        // Tính giờ phút giây còn lại
         const mins = Math.floor(remainingTime / 60000);
         const secs = Math.floor((remainingTime % 60000) / 1000);
         const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -1902,33 +1909,79 @@ function renderBoosts() {
     }
     
     html += createItem(
-        '<i data-lucide="zap" class="w-5 h-5"></i>', 'yellow',
+        '<i data-lucide="zap" class="w-5 h-5"></i>',
+        'yellow',
         'Nạp đầy bình', 
-        refillDesc, // Hiển thị text trạng thái
+        refillDesc,
         refillBtn
     );
 
-    // 2. Turbo
-    const canBuyTurbo = state.balance >= multitapCost;
-    const turboBtn = `<button onclick="applyBoost('multitap', this)" ${!canBuyTurbo ? 'disabled' : ''} class="${canBuyTurbo ? upgradeBtnStyle : disabledBtnStyle}">
-        ${formatNumber(multitapCost)} 💰
-    </button>`;
+    // =========================================================
+    // 1️⃣.5 💎 ĐỔI KIM CƯƠNG → NĂNG LƯỢNG (MỚI)
+    // =========================================================
+    const DIAMOND_COST = 10;
+    const ENERGY_GAIN = 500;
+
+    const canExchangeDiamond =
+        state.diamond >= DIAMOND_COST &&
+        state.energy < state.baseMaxEnergy;
+
+    const diamondDesc = canExchangeDiamond
+        ? `+${ENERGY_GAIN} năng lượng`
+        : (state.diamond < DIAMOND_COST
+            ? 'Không đủ kim cương'
+            : 'Năng lượng đã đầy');
+
+    const diamondBtn = `
+        <button
+            onclick="applyBoost('diamond_energy', this)"
+            ${!canExchangeDiamond ? 'disabled' : ''}
+            class="${canExchangeDiamond ? upgradeBtnStyle : disabledBtnStyle}">
+            ${DIAMOND_COST} 💎
+        </button>
+    `;
 
     html += createItem(
-        '<i data-lucide="chevrons-up" class="w-5 h-5"></i>', 'blue',
+        '<i data-lucide="gem" class="w-5 h-5"></i>',
+        'cyan',
+        'Đổi kim cương',
+        diamondDesc,
+        diamondBtn
+    );
+
+    // =========================================================
+    // 2️⃣ TURBO
+    // =========================================================
+    const canBuyTurbo = state.balance >= multitapCost;
+    const turboBtn = `
+        <button onclick="applyBoost('multitap', this)"
+            ${!canBuyTurbo ? 'disabled' : ''}
+            class="${canBuyTurbo ? upgradeBtnStyle : disabledBtnStyle}">
+            ${formatNumber(multitapCost)} 💰
+        </button>`;
+
+    html += createItem(
+        '<i data-lucide="chevrons-up" class="w-5 h-5"></i>',
+        'blue',
         `Turbo Lv.${state.multitapLevel}`, 
         `+${state.tapValue} chuyển đổi`,
         turboBtn
     );
 
-    // 3. Bình xăng
+    // =========================================================
+    // 3️⃣ BÌNH XĂNG
+    // =========================================================
     const canBuyTank = state.balance >= energyCost;
-    const tankBtn = `<button onclick="applyBoost('limit', this)" ${!canBuyTank ? 'disabled' : ''} class="${canBuyTank ? upgradeBtnStyle : disabledBtnStyle}">
-        ${formatNumber(energyCost)} 💰
-    </button>`;
+    const tankBtn = `
+        <button onclick="applyBoost('limit', this)"
+            ${!canBuyTank ? 'disabled' : ''}
+            class="${canBuyTank ? upgradeBtnStyle : disabledBtnStyle}">
+            ${formatNumber(energyCost)} 💰
+        </button>`;
 
     html += createItem(
-        '<i data-lucide="battery-charging" class="w-5 h-5"></i>', 'purple',
+        '<i data-lucide="battery-charging" class="w-5 h-5"></i>',
+        'purple',
         `Bình xăng Lv.${state.energyLimitLevel}`, 
         `Max ${formatNumber(state.baseMaxEnergy)} năng lượng`,
         tankBtn
@@ -1937,6 +1990,7 @@ function renderBoosts() {
     container.innerHTML = html;
     lucide.createIcons();
 }
+
 
 window.applyBoost = async (type, btn) => {
     // 1. Chặn click đúp
