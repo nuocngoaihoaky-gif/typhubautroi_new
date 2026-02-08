@@ -7,18 +7,16 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    
+
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Mặc định ẩn toàn bộ body để tránh lộ giao diện xấu */
         body {
-            background-color: #0f0f1a; /* Màu nền tím than */
+            background-color: #0f0f1a;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Chặn cuộn khi đang load */
+            overflow: hidden;
         }
 
-        /* CSS cứng cho màn hình Loading (Không phụ thuộc Tailwind) */
         #loading-screen {
             position: fixed;
             top: 0;
@@ -26,7 +24,7 @@
             width: 100vw;
             height: 100vh;
             background-color: #0f0f1a;
-            z-index: 99999; /* Luôn nằm trên cùng */
+            z-index: 99999;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,7 +32,6 @@
             transition: opacity 0.5s ease-out;
         }
 
-        /* Nếu Web tải xong thì class này sẽ được JS thêm vào để ẩn Loading */
         #loading-screen.hidden-load {
             opacity: 0;
             pointer-events: none;
@@ -65,39 +62,36 @@
 
     <div class="z-10 flex flex-col h-full w-full max-w-lg mx-auto bg-black/20 border-x border-white/5 h-screen relative">
 
+        <!-- ================= HEADER WRAPPER (FIX DÍNH TOP) ================= -->
+        <div class="pt-4 px-4 pb-2 z-20 relative flex-shrink-0">
 
-        
-<!-- HEADER WRAPPER -->
-<div class="pt-4 px-4 pb-2 z-20 relative flex-shrink-0">
-    <div class="flex items-center mb-4">
-        <!-- LEFT -->
-        <div class="flex items-center gap-2 bg-[#2d2d3e]/80 py-1 px-3 rounded-full border border-white/10">
-            <span class="text-xl">✈️</span>
-            <span class="text-sm font-bold">Tỷ Phú Bầu Trời</span>
-        </div>
+            <!-- HEADER -->
+            <div class="flex items-center mb-4">
+                <!-- LEFT -->
+                <div class="flex items-center gap-2 bg-[#2d2d3e]/80 py-1 px-3 rounded-full border border-white/10">
+                    <span class="text-xl">✈️</span>
+                    <span class="text-sm font-bold">Tỷ Phú Bầu Trời</span>
+                </div>
 
-        <!-- RIGHT -->
-        <div class="ml-auto flex items-center gap-2">
-            <div
-                id="mini-diamond"
-                data-ready="false"
-                class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
-                <span class="text-lg">💎</span>
-                <span id="mini-diamond-text" class="text-sm font-bold text-blue-400">0</span>
+                <!-- RIGHT -->
+                <div class="ml-auto flex items-center gap-2">
+                    <div
+                        id="mini-diamond"
+                        data-ready="false"
+                        class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                        <span class="text-lg">💎</span>
+                        <span id="mini-diamond-text" class="text-sm font-bold text-blue-400">0</span>
+                    </div>
+
+                    <div
+                        id="mini-balance"
+                        data-ready="false"
+                        class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                        <span class="text-lg">💰</span>
+                        <span id="mini-balance-text" class="text-sm font-bold text-yellow-400">0</span>
+                    </div>
+                </div>
             </div>
-
-            <div
-                id="mini-balance"
-                data-ready="false"
-                class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
-                <span class="text-lg">💰</span>
-                <span id="mini-balance-text" class="text-sm font-bold text-yellow-400">0</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-
 
             <!-- Level Bar -->
             <div class="w-full mb-3">
@@ -112,7 +106,9 @@
                     <div id="level-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out" style="width: 0%"></div>
                 </div>
             </div>
+
         </div>
+        <!-- ================= END HEADER WRAPPER ================= -->
 
         <!-- TAB: EXCHANGE -->
         <div id="tab-exchange" class="tab-content active px-4 pb-32 overflow-y-auto relative">
