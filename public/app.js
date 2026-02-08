@@ -49,7 +49,7 @@ const TASKS = [
     { 
         id: 1, 
         name: 'Tham gia Kênh Thông báo', 
-        reward: 25000, 
+        reward: 2500💎, 
         icon: '📢', 
         type: 'tele', // Đặt loại là tele
         link: 'https://t.me/vienduatin', 
@@ -58,7 +58,7 @@ const TASKS = [
     { 
         id: 2, 
         name: 'Tham gia Nhóm Chat', 
-        reward: 25000, 
+        reward: 2500💎, 
         icon: '👥', 
         type: 'tele', 
         link: 'https://t.me/BAOAPPMIENPHI22', 
@@ -67,7 +67,7 @@ const TASKS = [
     { 
         id: 3, 
         name: 'Intro Like Channel', 
-        reward: 25000, 
+        reward: 2500💎, 
         icon: '📢', 
         type: 'tele', // Đặt loại là tele
         link: 'https://t.me/IntroLikeChannel', 
@@ -76,17 +76,17 @@ const TASKS = [
     { 
         id: 4, 
         name: 'Cộng Đồng Intro Like', 
-        reward: 25000, 
+        reward: 2500💎, 
         icon: '👥', 
         type: 'tele', 
         link: 'https://t.me/CongDongIntroLike', 
         channelId: '@CongDongIntroLike' 
     },
-    { id: 5, name: 'Mời 5 bạn bè', reward: 500000, icon: '🤝', type: 'invite', count: 5 },
-    { id: 6, name: 'Mời 10 bạn bè', reward: 1000000, icon: '🤝', type: 'invite', count: 10 },
-    { id: 7, name: 'Mời 20 bạn bè', reward: 2500000, icon: '🤝', type: 'invite', count: 20 },
-    { id: 8, name: 'Mời 50 bạn bè', reward: 7000000, icon: '🤝', type: 'invite', count: 50 },
-    { id: 9, name: 'Mời 100 bạn bè', reward: 15000000, icon: '🤝', type: 'invite', count: 100 },
+    { id: 5, name: 'Mời 5 bạn bè', reward: 50000💎, icon: '🤝', type: 'invite', count: 5 },
+    { id: 6, name: 'Mời 10 bạn bè', reward: 100000💎, icon: '🤝', type: 'invite', count: 10 },
+    { id: 7, name: 'Mời 20 bạn bè', reward: 250000💎, icon: '🤝', type: 'invite', count: 20 },
+    { id: 8, name: 'Mời 50 bạn bè', reward: 700000💎, icon: '🤝', type: 'invite', count: 50 },
+    { id: 9, name: 'Mời 100 bạn bè', reward: 1500000💎, icon: '🤝', type: 'invite', count: 100 },
 ];
 
 const TASK_COOLDOWN = 15 * 60 * 1000; // 15 Phút
@@ -1433,7 +1433,7 @@ function renderAdsgramTaskBlock(containerId) {
         
         <div slot="reward" class="flex items-center gap-1 mt-1">
              <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
-                +25,000
+                +2,500💎
             </span>
         </div>
 
