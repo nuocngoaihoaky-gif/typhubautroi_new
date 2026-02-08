@@ -733,7 +733,9 @@ async function startFlight() {
 }
 
 // Kiểm tra kết quả
+// Kiểm tra kết quả (Polling)
 async function checkFlightResult() {
+    // Check lần 1: Trước khi gửi
     if (!flightPayload || flightResolved || ignoreCheckResult) return;
     if (checkingInProgress) return;
 
@@ -746,6 +748,15 @@ async function checkFlightResult() {
             headers: getHeaders(),
             body: JSON.stringify({ payload: flightPayload })
         });
+
+        // 🔥 CHECK LẦN 2 (QUAN TRỌNG): 
+        // Trong lúc chờ server trả lời (await ở trên), nếu user đã bấm Nhảy Dù (cashOut)
+        // thì biến ignoreCheckResult đã thành true.
+        // Lúc này ta PHẢI vứt bỏ kết quả check này đi, không được xử lý nữa.
+        if (ignoreCheckResult || flightResolved) {
+            checkingInProgress = false;
+            return; // <--- THOÁT NGAY
+        }
 
         if (!res.ok) {
             checkingInProgress = false;
@@ -768,7 +779,11 @@ async function checkFlightResult() {
         return;
     }
 
-    // ===== TỪ ĐÂY LÀ VÁN ĐÃ KẾT THÚC =====
+    // ===== TỪ ĐÂY LÀ VÁN ĐÃ KẾT THÚC (CRASH hoặc AUTO) =====
+    
+    // Chặn xung đột lần cuối
+    if (ignoreCheckResult || flightResolved) return;
+
     flightResolved = true;
     checkingInProgress = false;
 
@@ -782,7 +797,7 @@ async function checkFlightResult() {
         return;
     }
 
-    // 🟢 AUTO NHẢY
+    // 🟢 AUTO NHẢY (Server tự nhảy hộ)
     if (data.status === 'AUTO') {
         currentRunMoney = data.energyLost || 0;
         await doAutoJump(flightPayload);
@@ -887,15 +902,24 @@ function crash(lostAmount = 0) {
 }
 
 // Xử lý Nhảy dù (Cash Out)
+// Xử lý Nhảy dù (Cash Out)
 async function cashOut() {
-    // 1. CHẶN SPAM
+    // 1. CHẶN SPAM & TRẠNG THÁI KHÔNG HỢP LỆ
     if (!isFlying || flightResolved || isCashingOut) return;
 
-    // 2. KHÓA NGẦM
-    isCashingOut = true;
-    ignoreCheckResult = true; 
+    // ============================================================
+    // 🔥 KHÓA NGAY LẬP TỨC (CRITICAL SECTION)
+    // ============================================================
+    isCashingOut = true;      // Đánh dấu đang nhảy
+    ignoreCheckResult = true; // ⛔ RA LỆNH: Mọi gói tin Check đang bay về -> VỨT HẾT
+    
+    // ⛔ DỪNG TIMER CHECK NGAY (Không gửi thêm lệnh check nào nữa)
+    if (checkTimer) {
+        clearInterval(checkTimer);
+        checkTimer = null;
+    }
 
-    // 3. UI GIỮ NGUYÊN (Không đổi text nút, máy bay vẫn bay)
+    // 3. UI GIỮ NGUYÊN
     
     // 4. GỌI SERVER
     let data;
@@ -910,29 +934,31 @@ async function cashOut() {
         data = await res.json();
     } catch (e) {
         console.error("Cashout error:", e);
+        // Nếu lỗi mạng khi nhảy -> Coi như mất kết nối -> Nổ (hoặc xử lý tùy ý)
         crash(currentRunMoney); 
         return;
     }
 
-    // 5. XỬ LÝ KẾT QUẢ
+    // 5. XỬ LÝ KẾT QUẢ TỪ API JUMP
     
-    // CRASH LATE
+    // Trường hợp xấu: Server bảo "Mày bấm chậm quá, nổ xừ rồi"
     if (data.type === 'CRASH_LATE') {
         crash(data.energyLost); 
         return;
     }
 
-    // THÀNH CÔNG
+    // Trường hợp tốt: THÀNH CÔNG
     if (data.ok) {
-        clearInterval(flightInterval);
-        clearInterval(checkTimer);
+        clearInterval(flightInterval); // Dừng máy bay bay
+        // clearInterval(checkTimer); // Đã clear ở trên rồi, nhưng thừa ko sao
+        
         isFlying = false;
         flightResolved = true;
         flightPhase = 'ENDED';
 
         const profit = data.earned;
         
-        // Cộng tiền ngay (Dùng dữ liệu từ jump.js trả về)
+        // Cộng tiền ngay (Optimistic UI)
         state.balance += profit;
         state.totalEarned += profit;
         state.exp += profit;
@@ -944,9 +970,10 @@ async function cashOut() {
         const label = document.querySelector('#overlay-success span');
         if (label) label.innerText = `+${formatNumber(profit)}`;
 
-        const btn = document.getElementById('main-action-btn');
-        btn.innerHTML = `🪂 THÀNH CÔNG (+${formatNumber(profit)})`;
-        btn.className = "w-full py-4 rounded-2xl font-black text-xl text-center bg-green-600 text-white border-b-4 border-green-800";
+        if (btn) {
+            btn.innerHTML = `🪂 THÀNH CÔNG (+${formatNumber(profit)})`;
+            btn.className = "w-full py-4 rounded-2xl font-black text-xl text-center bg-green-600 text-white border-b-4 border-green-800";
+        }
 
         // Animation dù
         const parachute = document.getElementById('active-parachute');
@@ -965,9 +992,8 @@ async function cashOut() {
         // Chờ animation xong thì Reset luôn
         await new Promise(r => setTimeout(r, MIN_RESET_DELAY));
         
-        // ❌ BỎ DÒNG NÀY: await loadUserInfo(); (Vì resetGame sẽ gọi)
-        
-        resetGame(); // Trong này có gọi loadUserInfo rồi
+        // Reset game & Sync tiền
+        resetGame(); 
     }
 }
 
@@ -1244,12 +1270,40 @@ function renderInvestments() {
     lucide.createIcons();
 }
 
-window.buyInvestment = async (id, btn) => {
-    // Nếu nút đang disable hoặc không tồn tại thì bỏ qua
-    if (!btn || btn.disabled) return;
-    isTransactionPending = true;
+// =============================================================================
+// 🔥 SMART INVESTMENTS (TIẾT KIỆM READ - CẬP NHẬT THỦ CÔNG)
+// =============================================================================
 
-    // Bắt đầu hiệu ứng xoay
+// 1. MUA GÓI ĐẦU TƯ
+window.buyInvestment = async (id, btn) => {
+    // A. VALIDATE FRONTEND (Chặn ngay từ cửa để đỡ tốn Request)
+    if (!btn || btn.disabled || isTransactionPending) return;
+
+    const card = INVESTMENT_CARDS.find(c => c.id === id);
+    if (!card) return showNotification('Gói không tồn tại', 'error');
+
+    // Check 1: Đủ tiền không?
+    if (state.balance < card.cost) {
+        return showNotification('Số dư không đủ!', 'error');
+    }
+
+    // Check 2: Đủ Level không?
+    const currentLevelIdx = LEVEL_THRESHOLDS.findIndex((l, i) => {
+        const next = LEVEL_THRESHOLDS[i + 1];
+        return state.totalEarned >= l.threshold && (!next || state.totalEarned < next.threshold);
+    });
+    
+    if (currentLevelIdx < card.levelReq) {
+        return showNotification(`Cần đạt cấp ${LEVEL_THRESHOLDS[card.levelReq].name}`, 'error');
+    }
+
+    // Check 3: Đang mua rồi thì thôi
+    if (state.investments[id]) {
+        return showNotification('Gói này đang chạy rồi', 'error');
+    }
+
+    // B. GỌI API
+    isTransactionPending = true;
     setLoading(btn, true);
 
     try {
@@ -1258,40 +1312,57 @@ window.buyInvestment = async (id, btn) => {
             headers: getHeaders(),
             body: JSON.stringify({ id })
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok) {
             throw new Error(data.error || 'Lỗi kết nối');
         }
 
+        // C. THÀNH CÔNG -> TỰ CẬP NHẬT STATE (KHÔNG GỌI SYNC)
         showNotification('Đầu tư thành công!', 'success');
-        
-        // Sync lại thông tin (tiền trừ đi, gói hiện ra) 
-        // silent: true để tiền không chạy lại từ 0 gây rối mắt
-        await loadUserInfo({ silent: true }); 
+
+        // 1. Trừ tiền thủ công
+        state.balance -= card.cost;
+
+        // 2. Kích hoạt gói thủ công
+        // Nếu Server trả về finish_time thì dùng, không thì tự tính (1 tiếng)
+        // Việc này giúp hiển thị đồng hồ đếm ngược ngay lập tức
+        state.investments[id] = data.finish_time || (Date.now() + 3600000); 
+
+        // 3. Vẽ lại giao diện ngay lập tức
+        updateUI(); // Cập nhật số tiền trên header
+        renderInvestments(); // Chuyển nút Mua -> Đồng hồ
 
     } catch (e) {
         showNotification(e.message, 'error');
+        // Lỗi thì thôi, tiền vẫn nguyên, nút vẫn nguyên
     } finally {
-        // 🟢 QUAN TRỌNG: Mở khóa trước
-        isTransactionPending = false; 
-        
-        // Tắt xoay nút
+        isTransactionPending = false;
         setLoading(btn, false);
-
-        // 🔥 BẮT BUỘC VẼ LẠI GIAO DIỆN NGAY LÚC NÀY
-        // Để nút chuyển từ "Mua" -> "Đang chạy (Timer)"
-        renderInvestments(); 
-        updateUI(); 
     }
 };
 
+// 2. THU HOẠCH GÓI ĐẦU TƯ
 window.claimInvestment = async (id, btn) => {
-    if (!btn || btn.disabled) return;
-    isTransactionPending = true;
+    // A. VALIDATE FRONTEND
+    if (!btn || btn.disabled || isTransactionPending) return;
 
-    // Bắt đầu hiệu ứng xoay
+    const card = INVESTMENT_CARDS.find(c => c.id === id);
+    if (!card) return;
+
+    // Check: Đã đầu tư chưa?
+    const finishTime = state.investments[id];
+    if (!finishTime) return showNotification('Chưa đầu tư gói này', 'error');
+
+    // Check: Đã đến giờ chưa?
+    // Cho phép sai số 2 giây để user đỡ bị khó chịu
+    if (Date.now() < finishTime - 2000) {
+        return showNotification('Chưa đến giờ thu hoạch', 'error');
+    }
+
+    // B. GỌI API
+    isTransactionPending = true;
     setLoading(btn, true);
 
     try {
@@ -1307,25 +1378,30 @@ window.claimInvestment = async (id, btn) => {
             throw new Error(data.error || 'Lỗi kết nối');
         }
 
-        showNotification('Thu hoạch thành công!', 'success');
+        // C. THÀNH CÔNG -> TỰ CẬP NHẬT STATE (KHÔNG GỌI SYNC)
+        const profit = card.cost + card.profit;
+        showNotification(`Thu hoạch +${formatNumber(profit)}`, 'success');
+
+        // 1. Cộng tiền thủ công
+        state.balance += profit;
         
-        // Cập nhật lại số dư và xóa gói đã nhận
-        await loadUserInfo({ silent: true });
+        // 2. Xóa gói khỏi danh sách đang chạy
+        delete state.investments[id];
+
+        // 3. Update tổng thu nhập (nếu cần để tính level)
+        // state.totalEarned += profit; 
+
+        // 4. Vẽ lại giao diện
+        updateUI();
+        renderInvestments(); // Chuyển nút Nhận -> Mua lại
 
     } catch (e) {
         showNotification(e.message, 'error');
     } finally {
-        // 🟢 QUAN TRỌNG: Mở khóa
-        isTransactionPending = false; 
+        isTransactionPending = false;
         setLoading(btn, false);
-
-        // 🔥 BẮT BUỘC VẼ LẠI GIAO DIỆN
-        // Để nút chuyển từ "Nhận" -> "Mua lại"
-        renderInvestments();
-        updateUI();
     }
 };
-
 // =============================================================================
 // REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ UPDATE THEO YÊU CẦU
 // =============================================================================
