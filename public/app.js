@@ -731,6 +731,7 @@ let flightResolved = false;
 let ignoreCheckResult = false; 
 let visualEnergy = 0;
 let isEditingBoostInput = false;
+let openedBoostPanel = null; // 'buy_energy' | 'gold_to_diamond' | null
 
 function calcAngle() {
     const container = document.getElementById('game-container');
@@ -1852,124 +1853,136 @@ document.getElementById('withdraw-amount').addEventListener('input', (e) => {
 });
 
 function renderBoosts(force = false) {
-    if (isEditingBoostInput && !force) return;
-
     const container = document.getElementById('boost-list');
     if (!container) return;
-    
+
     const multitapCost = 5000 * Math.pow(2, state.multitapLevel - 1);
     const energyCost = 5000 * Math.pow(2, state.energyLimitLevel - 1);
 
-    const upgradeBtnStyle =
-        "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all min-w-[90px]";
-    const disabledBtnStyle =
-        "px-4 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60 min-w-[90px]";
+    const btnStyle =
+        "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all";
+    const btnDisabled =
+        "px-4 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60";
 
-    const createItem = (icon, color, name, desc, bodyHtml) => `
-        <div class="bg-[#1e1e2e] border border-white/5 p-4 rounded-xl shadow-md mb-4">
-            <div class="flex items-center gap-4 mb-3">
-                <div class="w-10 h-10 rounded-full bg-${color}-500/20 text-${color}-400 flex items-center justify-center border border-${color}-500/30">
-                    ${icon}
+    const row = (icon, color, title, desc, actionHtml, expandHtml = '', key = null) => `
+        <div class="bg-[#1e1e2e] border border-white/5 rounded-xl shadow-md mb-3 overflow-hidden">
+            <div class="p-4 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-${color}-500/20 text-${color}-400 flex items-center justify-center border border-${color}-500/30">
+                        ${icon}
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-white">${title}</div>
+                        <div class="text-[10px] text-gray-400">${desc}</div>
+                    </div>
                 </div>
-                <div>
-                    <div class="font-bold text-sm text-white">${name}</div>
-                    <div class="text-[11px] text-gray-400">${desc}</div>
-                </div>
+                ${actionHtml}
             </div>
-            ${bodyHtml}
+
+            ${
+                key && openedBoostPanel === key
+                    ? `<div class="px-4 pb-4 border-t border-white/5">${expandHtml}</div>`
+                    : ''
+            }
         </div>
     `;
 
     let html = '';
 
-    // =================================================
-    // TURBO
-    // =================================================
-    html += createItem(
+    // ================= TURBO =================
+    html += row(
         '<i data-lucide="chevrons-up" class="w-5 h-5"></i>',
         'blue',
         `Turbo Lv.${state.multitapLevel}`,
         `+${state.tapValue} chuyển đổi`,
         `<button onclick="applyBoost('multitap', this)"
             ${state.balance < multitapCost ? 'disabled' : ''}
-            class="${state.balance >= multitapCost ? upgradeBtnStyle : disabledBtnStyle}">
+            class="${state.balance >= multitapCost ? btnStyle : btnDisabled}">
             ${formatNumber(multitapCost)} 💰
         </button>`
     );
 
-    // =================================================
-    // BÌNH XĂNG
-    // =================================================
-    html += createItem(
+    // ================= BÌNH XĂNG =================
+    html += row(
         '<i data-lucide="battery-charging" class="w-5 h-5"></i>',
         'purple',
         `Bình xăng Lv.${state.energyLimitLevel}`,
         `Max ${formatNumber(state.baseMaxEnergy)} năng lượng`,
         `<button onclick="applyBoost('limit', this)"
             ${state.balance < energyCost ? 'disabled' : ''}
-            class="${state.balance >= energyCost ? upgradeBtnStyle : disabledBtnStyle}">
+            class="${state.balance >= energyCost ? btnStyle : btnDisabled}">
             ${formatNumber(energyCost)} 💰
         </button>`
     );
 
-    // =================================================
-    // 💎 MUA NĂNG LƯỢNG (INPUT – RỘNG – Ở CUỐI)
-    // =================================================
-    const maxEnergyBuy = state.baseMaxEnergy - state.energy;
-
-    html += createItem(
+    // ================= 💎 MUA NĂNG LƯỢNG =================
+    html += row(
         '<i data-lucide="zap" class="w-5 h-5"></i>',
         'yellow',
         'Mua năng lượng',
-        '1 💎 = 50 ⚡',
+        'Kim cương → năng lượng',
+        `<button onclick="toggleBoostPanel('buy_energy')" class="${btnStyle}">
+            Mua
+        </button>`,
         `
-        <div class="flex flex-col gap-3">
-            <input
-                id="buy-energy-input"
-                type="number"
-                min="1"
-                max="${maxEnergyBuy}"
-                placeholder="Nhập số năng lượng muốn mua"
-                class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm"
-                onfocus="isEditingBoostInput = true"
-                onblur="isEditingBoostInput = false"
-                oninput="updateBuyEnergyPreview()"
-            />
-
-            <button
-                id="buy-energy-btn"
-                onclick="applyBoost('buy_energy', this)"
-                class="${upgradeBtnStyle}"
-                disabled>
-                💎 0
-            </button>
-        </div>
-        `
+        <input
+            id="buy-energy-input"
+            type="number"
+            min="1"
+            placeholder="Nhập số năng lượng"
+            class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
+            oninput="updateBuyEnergyPreview()"
+        />
+        <button id="buy-energy-confirm"
+            onclick="confirmBuyEnergy(this)"
+            class="${btnStyle} w-full"
+            disabled>
+            💎 0
+        </button>
+        `,
+        'buy_energy'
     );
 
-    // =================================================
-    // 🪙 ĐỔI VÀNG → KIM CƯƠNG (1:1)
-    // =================================================
-    html += createItem(
+    // ================= 🪙 ĐỔI VÀNG → KC =================
+    html += row(
         '<i data-lucide="gem" class="w-5 h-5"></i>',
         'cyan',
         'Đổi vàng → kim cương',
         'Tỷ lệ 1 💰 = 1 💎',
-        `<button onclick="applyBoost('gold_to_diamond', this)"
-            ${state.balance < 1 ? 'disabled' : ''}
-            class="${state.balance >= 1 ? upgradeBtnStyle : disabledBtnStyle}">
-            Đổi ngay
-        </button>`
+        `<button onclick="toggleBoostPanel('gold_to_diamond')" class="${btnStyle}">
+            Đổi
+        </button>`,
+        `
+        <input
+            id="gold-to-diamond-input"
+            type="number"
+            min="1"
+            placeholder="Nhập số vàng"
+            class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm mb-3"
+            oninput="updateGoldToDiamondPreview()"
+        />
+        <button id="gold-to-diamond-confirm"
+            onclick="confirmGoldToDiamond(this)"
+            class="${btnStyle} w-full"
+            disabled>
+            Đổi
+        </button>
+        `,
+        'gold_to_diamond'
     );
 
     container.innerHTML = html;
     lucide.createIcons();
 }
 
+window.toggleBoostPanel = (key) => {
+    openedBoostPanel = openedBoostPanel === key ? null : key;
+    renderBoosts(true);
+};
 
 window.updateBuyEnergyPreview = () => {
     const input = document.getElementById('buy-energy-input');
-    const btn = document.getElementById('buy-energy-btn');
+    const btn = document.getElementById('buy-energy-confirm');
     if (!input || !btn) return;
 
     const ENERGY_PER_DIAMOND = 50;
@@ -1981,8 +1994,8 @@ window.updateBuyEnergyPreview = () => {
         return;
     }
 
-    const maxCanBuy = state.baseMaxEnergy - state.energy;
-    const energy = Math.min(want, maxCanBuy);
+    const max = state.baseMaxEnergy - state.energy;
+    const energy = Math.min(want, max);
     const diamonds = Math.ceil(energy / ENERGY_PER_DIAMOND);
 
     if (diamonds > state.diamond) {
@@ -1995,7 +2008,32 @@ window.updateBuyEnergyPreview = () => {
     btn.disabled = false;
 };
 
+window.confirmBuyEnergy = (btn) => {
+    btn.dataset.energy = document.getElementById('buy-energy-input').value;
+    applyBoost('buy_energy', btn);
+};
 
+window.updateGoldToDiamondPreview = () => {
+    const input = document.getElementById('gold-to-diamond-input');
+    const btn = document.getElementById('gold-to-diamond-confirm');
+    if (!input || !btn) return;
+
+    const gold = parseInt(input.value);
+
+    if (!gold || gold <= 0 || gold > state.balance) {
+        btn.innerText = 'Không đủ 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    btn.innerText = `Đổi (${gold} 💎)`;
+    btn.disabled = false;
+};
+
+window.confirmGoldToDiamond = (btn) => {
+    btn.dataset.gold = document.getElementById('gold-to-diamond-input').value;
+    applyBoost('gold_to_diamond', btn);
+};
 
 window.applyBoost = async (type, btn) => {
     // 1. Chặn click đúp
