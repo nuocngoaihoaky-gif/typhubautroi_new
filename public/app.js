@@ -1081,7 +1081,7 @@ function startLoops() {
 
 function updateUI() {
     animateBalance(state.balance);
-    const diamondEl = document.getElementById('diamond-display');
+    const diamondEl = document.getElementById('mini-diamond-text');
     if (diamondEl) {
         // formatNumber giúp hiển thị đẹp (ví dụ 1,000 thay vì 1000)
         diamondEl.innerText = formatNumber(state.diamond || 0); 
