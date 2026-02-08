@@ -24,21 +24,22 @@ export default async function handler(req, res) {
     const uid = String(tgUser.id);
 
     // ================= 2. NHẬN DATA =================
-    const { amount, bank_code, account_number, account_name } = req.body;
+    let { amount, bank_code, account_number, account_name } = req.body;
 
-    if (!amount || amount < MIN_WITHDRAW) {
+    const withdrawAmount = Number(amount); // 🔥 ÉP KIỂU
+
+    if (!withdrawAmount || withdrawAmount < MIN_WITHDRAW) {
         return res.status(400).json({ error: 'Số tiền rút tối thiểu 2,000,000 xu' });
     }
     if (!bank_code || !account_number || !account_name) {
         return res.status(400).json({ error: 'Thiếu thông tin ngân hàng' });
     }
 
-    // Chống rác nhẹ
     if (!/^\d{6,20}$/.test(account_number)) {
         return res.status(400).json({ error: 'Số tài khoản không hợp lệ' });
     }
 
-    const realAmountVND = Math.floor(amount * RATE);
+    const realAmountVND = Math.floor(withdrawAmount * RATE);
     const bankKey = `${bank_code}_${account_number}`;
 
     const userRef = db.collection('users').doc(uid);
@@ -56,7 +57,6 @@ export default async function handler(req, res) {
 
         // ================= 4. CHECK / LOCK BANK =================
         if (!existedBank) {
-            // RÚT LẦN ĐẦU → CHECK TRÙNG
             await db.runTransaction(async (tx) => {
                 const bankSnap = await tx.get(bankIndexRef);
                 if (bankSnap.exists) {
@@ -78,7 +78,6 @@ export default async function handler(req, res) {
                 });
             });
         }
-        // Nếu đã có bank_info → dùng luôn, KHÔNG READ thêm
 
         // ================= 5. GỬI TIN ADMIN (CHỜ) =================
         sentMsgId = await sendTelegramFirst(
@@ -92,20 +91,39 @@ export default async function handler(req, res) {
         const transCode = sentMsgId.toString();
 
         // ================= 6. TRỪ TIỀN (REALTIME DB) =================
-        await walletRef.transaction((data) => {
-            if (!data || (data.balance || 0) < amount) {
-                throw new Error('NOT_ENOUGH_BALANCE');
+        let committed = false;
+
+        await walletRef.transaction(
+            (data) => {
+                if (!data || typeof data.balance !== 'number') {
+                    return; // abort
+                }
+
+                if (data.balance < withdrawAmount) {
+                    return; // abort
+                }
+
+                data.balance -= withdrawAmount;
+                return data;
+            },
+            (error, success) => {
+                if (error) {
+                    throw error;
+                }
+                committed = success;
             }
-            data.balance -= amount;
-            return data;
-        });
+        );
+
+        if (!committed) {
+            throw new Error('NOT_ENOUGH_BALANCE');
+        }
 
         // ================= 7. LƯU LỊCH SỬ =================
         await socialRef.update({
             withdrawHistory: FieldValue.arrayUnion({
                 id: transCode,
                 amount: realAmountVND,
-                amountGold: amount,
+                amountGold: withdrawAmount,
                 method: bank_code,
                 address: `${account_number} - ${account_name}`,
                 status: 'pending',
