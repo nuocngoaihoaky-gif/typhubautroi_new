@@ -1041,30 +1041,36 @@ function loadData() {
 }
 
 function animateBalance(target) {
-    if (target <= currentDisplayBalance) {
-        currentDisplayBalance = target;
+    // Nếu target = hiện tại thì không cần chạy animation, nhưng vẫn phải gán text để chắc chắn
+    if (target === currentDisplayBalance) {
+        const formatted = formatNumber(target);
+        if(document.getElementById('balance-display')) document.getElementById('balance-display').innerText = formatted;
+        if(document.getElementById('mini-balance-text')) document.getElementById('mini-balance-text').innerText = formatted;
+        if(document.getElementById('withdraw-balance')) document.getElementById('withdraw-balance').innerText = formatted;
         return;
     }
 
     const start = currentDisplayBalance;
     const diff = target - start;
     const duration = 700;
-
     let startTime = null;
 
     function step(ts) {
         if (!startTime) startTime = ts;
         const p = Math.min((ts - startTime) / duration, 1);
-        const ease = 1 - Math.pow(1 - p, 3);
-
+        const ease = 1 - Math.pow(1 - p, 3); // Ease out cubic
+        
         currentDisplayBalance = Math.floor(start + diff * ease);
+        const formatted = formatNumber(currentDisplayBalance);
 
-        document.getElementById('balance-display').innerText =
-            formatNumber(currentDisplayBalance);
-        document.getElementById('mini-balance-text').innerText =
-            formatNumber(currentDisplayBalance);
-        document.getElementById('withdraw-balance').innerText =
-            formatNumber(currentDisplayBalance);
+        // 🔥 CẬP NHẬT CẢ 3 VỊ TRÍ
+        const elBig = document.getElementById('balance-display');      // Số to màn hình bay
+        const elMini = document.getElementById('mini-balance-text');   // Số nhỏ header
+        const elWithdraw = document.getElementById('withdraw-balance');// Số trong tab rút
+        
+        if (elBig) elBig.innerText = formatted;
+        if (elMini) elMini.innerText = formatted;
+        if (elWithdraw) elWithdraw.innerText = formatted;
 
         if (p < 1) requestAnimationFrame(step);
     }
@@ -1986,40 +1992,29 @@ function renderWithdrawHistory() {
 
 // Thêm tham số btn để nhận nút bấm
 window.submitWithdraw = async (btn) => {
-    // Fallback nếu quên sửa HTML
     if (!btn) btn = document.getElementById('withdraw-btn');
 
-    const amount = parseInt(document.getElementById('withdraw-amount').value);
+    const amountInput = document.getElementById('withdraw-amount');
+    const amount = parseInt(amountInput.value);
     
-    // 👇 ID này phải khớp với HTML (giữ nguyên id="bank-name" như đã thống nhất)
     const bank = document.getElementById('bank-name').value; 
     const number = document.getElementById('account-number').value;
     const holder = document.getElementById('account-holder').value;
 
-    if (!amount || amount < 2000000) {
-        showNotification('Số tiền rút tối thiểu 2,000,000 xu', 'error');
-        return;
-    }
-    if (amount > state.balance) {
-        showNotification('Số dư không đủ', 'error');
-        return;
-    }
-    if (!bank || !number || !holder) {
-        showNotification('Vui lòng điền đủ thông tin', 'error');
-        return;
-    }
+    // Validate
+    if (!amount || amount < 2000000) return showNotification('Tối thiểu 2,000,000 xu', 'error');
+    if (amount > state.balance) return showNotification('Số dư không đủ', 'error');
+    if (!bank || !number || !holder) return showNotification('Vui lòng điền đủ thông tin', 'error');
 
-    // 1. Bắt đầu xoay nút
-    if (btn) setLoading(btn, true);
+    // 1. GỌI API
+    setLoading(btn, true);
 
     try {
-        // 2. Gửi lệnh lên Server (SỬA BODY JSON)
         const res = await fetch(`${API_BASE}/withdraw`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({
                 amount: amount,
-                // 👇 SỬA CÁC TRƯỜNG NÀY ĐỂ KHỚP API MỚI 👇
                 bank_code: bank,        
                 account_number: number, 
                 account_name: holder    
@@ -2032,29 +2027,34 @@ window.submitWithdraw = async (btn) => {
             throw new Error(data.error || 'Rút tiền thất bại');
         }
 
-        // 3. Thành công
+        // ============================================================
+        // 2. API THÀNH CÔNG -> TRỪ TIỀN VÀ THÊM LỊCH SỬ
+        // ============================================================
         showNotification('Đã gửi yêu cầu rút tiền!', 'success');
-        
-        // Clear ô nhập liệu
-        document.getElementById('withdraw-amount').value = '';
 
-        // 4. Tải lại dữ liệu
-        await Promise.all([
-            loadUserInfo({ silent: true }), 
-            loadAuxData()                   
-        ]);
+        // Trừ tiền
+        state.balance -= amount;
 
-        // 5. Vẽ lại giao diện
+        // Thêm lịch sử mới vào đầu danh sách (Lấy ID từ server trả về cho chuẩn)
+        state.withdrawHistory.unshift({
+            id: data.id || 'PENDING',
+            amount: amount,
+            method: bank,
+            status: 'pending', // Server mới tạo thì luôn là pending
+            created_at: Date.now()
+        });
+
+        // Xóa ô nhập và cập nhật UI
+        amountInput.value = '';
+        updateUI();
         renderWithdrawHistory();
 
     } catch (e) {
         showNotification(e.message, 'error');
     } finally {
-        // 6. Dừng xoay
-        if (btn) setLoading(btn, false);
+        setLoading(btn, false);
     }
 };
-
 document.getElementById('withdraw-amount').addEventListener('input', (e) => {
     const val = e.target.value;
     document.getElementById('withdraw-rate').innerText = `Quy đổi: ${formatNumber(val * 0.001)} VNĐ`;
