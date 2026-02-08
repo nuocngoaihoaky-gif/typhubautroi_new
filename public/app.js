@@ -1,201 +1,97 @@
-// =========================================
-// 💰 CẤU HÌNH 2 LOẠI QUẢNG CÁO
-// =========================================
+// =============================================================================
+// REGION 1: CẤU HÌNH & CONSTANTS (DỮ LIỆU TĨNH)
+// =============================================================================
+
+// 💰 CẤU HÌNH QUẢNG CÁO
 const ID_ENERGY_AD = "2291";      // Loại Reward (Bắt buộc xem hết)
 const ID_FLY_AD    = "int-2308";  // Loại Interstitial (Có thể tắt)
 const ID_TASK_AD   = "task-2327";
-const ID_DAILY_AD    = "2240";
+const ID_DAILY_AD  = "2240";
 
-let EnergyAdController; // Điều khiển QC Năng lượng
-let FlyAdController;    // Điều khiển QC Bay
-let DailyAdController;
-
-// Khởi tạo 2 bộ điều khiển riêng biệt
-if (window.Adsgram) {
-    EnergyAdController = window.Adsgram.init({ blockId: ID_ENERGY_AD });
-    FlyAdController    = window.Adsgram.init({ blockId: ID_FLY_AD });
-    DailyAdController    = window.Adsgram.init({ blockId: ID_DAILY_AD });
-}
-
-// -----------------------------------------------------------
-// 1️⃣ HÀM CHO NÚT HỒI NĂNG LƯỢNG (Khắt khe)
-// -----------------------------------------------------------
-async function showEnergyAd() {
-    return new Promise((resolve, reject) => {
-        // Adsgram chưa sẵn sàng
-        if (!EnergyAdController) {
-            reject(new Error('Quảng cáo chưa sẵn sàng, vui lòng thử lại sau'));
-            return;
-        }
-
-        EnergyAdController.show()
-            .then((result) => {
-                // BẮT BUỘC xem hết
-                if (result && result.done === true) {
-                    resolve(true);
-                } else {
-                    reject(new Error('Bạn cần xem hết quảng cáo để hồi năng lượng'));
-                }
-            })
-            .catch(() => {
-                reject(new Error('Quảng cáo gặp lỗi, vui lòng thử lại sau'));
-            });
-    });
-}
-
-async function showDaily() {
-    return new Promise((resolve, reject) => {
-        // Adsgram chưa sẵn sàng
-        if (!DailyAdController) {
-            reject(new Error('Quảng cáo chưa sẵn sàng, vui lòng thử lại sau'));
-            return;
-        }
-
-        DailyAdController.show()
-            .then((result) => {
-                // BẮT BUỘC xem hết
-                if (result && result.done === true) {
-                    resolve(true);
-                } else {
-                    reject(new Error('Bạn cần xem hết quảng cáo để điểm danh'));
-                }
-            })
-            .catch(() => {
-                reject(new Error('Quảng cáo gặp lỗi, vui lòng thử lại sau'));
-            });
-    });
-}
-// -----------------------------------------------------------
-// 2️⃣ HÀM CHO NÚT BAY (Dễ tính)
-// -----------------------------------------------------------
-async function showFlyAd() {
-    return new Promise((resolve) => {
-        if (FlyAdController) {
-            FlyAdController.show().then((result) => {
-                // Với Interstitial, dù xem hết hay tắt ngang (result.done = false)
-                // THÌ VẪN CHO BAY. Mục đích là hiện QC thôi.
-                resolve(true); 
-            }).catch((err) => {
-                console.warn("Lỗi QC Bay:", err);
-                resolve(true); // Lỗi cũng cho bay luôn
-            });
-        } else {
-            resolve(true);
-        }
-    });
-}
-// =========================================
-// 1. CẤU HÌNH & KHỞI TẠO
-// =========================================
-tailwind.config = {
-    theme: {
-        extend: {
-            colors: {
-                bg: '#0b0b15',          // Nền tối hơn, sâu hơn
-                surface: '#1c1c2e',     // Màu nền card
-                glass: 'rgba(30, 30, 46, 0.7)', // Hiệu ứng kính
-                primary: '#3b82f6',
-                accent: '#eab308',
-            },
-            fontFamily: {
-                sans: ['ui-sans-serif', 'system-ui', 'sans-serif']
-            },
-            animation: {
-                'spin-fast': 'spin 0.7s linear infinite',
-            }
-        }
-    }
-}
-// Khởi tạo Telegram WebApp
-const tg = window.Telegram.WebApp;
-const API_BASE = '/api'; // Đường dẫn gốc của API Server
-
-// Cấu hình Telegram
-try {
-    tg.expand(); // Mở full màn hình
-    tg.disableVerticalSwipes(); // Chống vuốt dọc tắt app (quan trọng cho game)
-    tg.enableClosingConfirmation(); // Hỏi lại trước khi đóng app
-    
-    // Chỉnh màu Header của Telegram cho trùng màu game luôn
-    tg.setHeaderColor('#0f0f1a'); 
-    tg.setBackgroundColor('#0f0f1a');
-} catch (e) {
-    console.log("Đang chạy ngoài Telegram hoặc phiên bản cũ");
-}
-
-// Biến toàn cục (System)
-let gameToken = null;      // Token phiên chơi (cho bảo mật)
-
-// Helper: Tạo headers chuẩn cho mọi request (Tự động kèm chữ ký bảo mật)
-const getHeaders = () => {
-    return {
-        'Content-Type': 'application/json',
-        'x-init-data': tg.initData // Server sẽ check cái này
-    };
+// 🏦 DANH SÁCH NGÂN HÀNG
+const BANK_FULL_NAMES = {
+    'MB': 'MB Bank',
+    'VCB': 'Vietcombank',
+    'TCB': 'Techcombank',
+    'ACB': 'Ngân hàng ACB',
+    'ICB': 'VietinBank',
+    'BIDV': 'BIDV',
+    'TPB': 'TPBank',
+    'VPB': 'VPBank'
 };
-// Helper: Xử lý hiệu ứng loading cho nút bấm
-// Chèn CSS động cho Toast (Chỉ khai báo 1 lần duy nhất ở đây)
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    .toast-enter { animation: slideIn 0.3s ease-out forwards; }
-    .toast-exit { animation: fadeOut 0.3s ease-out forwards; }
-`;
-document.head.appendChild(styleSheet);
 
-// Hàm hiện thông báo góc màn hình
-function showNotification(msg, type = 'success') {
-    let box = document.getElementById('toast-box');
-    if (!box) {
-        box = document.createElement('div');
-        box.id = 'toast-box';
-        box.className = 'fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none';
-        document.body.appendChild(box);
-    }
+// 🎮 CẤU HÌNH LEVEL
+const LEVEL_THRESHOLDS = [
+    { name: 'Tập sự', threshold: 0 },
+    { name: 'Cơ phó', threshold: 500000 },
+    { name: 'Cơ trưởng', threshold: 5000000 },
+    { name: 'Phi hành gia', threshold: 50000000 },
+    { name: 'Sao Hỏa', threshold: 500000000 }
+];
 
-    const toast = document.createElement('div');
-    // Màu sắc tươi sáng: Xanh lá (Thành công) / Đỏ (Lỗi)
-    const bg = type === 'success' ? 'bg-emerald-500' : 'bg-rose-500';
-    const icon = type === 'success' ? 'check-circle' : 'alert-circle';
-    
-    toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 min-w-[220px] pointer-events-auto toast-enter border-2 border-white/20`;
-    toast.innerHTML = `
-        <i data-lucide="${icon}" class="w-5 h-5"></i>
-        <span class="font-bold text-sm drop-shadow-md">${msg}</span>
-    `;
+// 🎁 CẤU HÌNH PHẦN THƯỞNG ĐIỂM DANH
+const DAILY_REWARDS = [5000, 5000, 5500, 5000, 10000, 5000, 5000, 10000, 5000, 30000];
 
-    box.appendChild(toast);
-    lucide.createIcons();
+// 💼 CẤU HÌNH GÓI ĐẦU TƯ
+const INVESTMENT_CARDS = [
+    { id: 1, name: 'Vé xe buýt', cost: 1000, profit: 400, levelReq: 0, icon: '🚌' },
+    { id: 2, name: 'Chỗ gửi xe', cost: 5000, profit: 2500, levelReq: 0, icon: '🅿️' },
+    { id: 3, name: 'Suất ăn', cost: 10000, profit: 6000, levelReq: 1, icon: '🍱' },
+    { id: 4, name: 'Hàng miễn thuế', cost: 50000, profit: 35000, levelReq: 2, icon: '🛍️' },
+    { id: 5, name: 'Quảng cáo', cost: 200000, profit: 160000, levelReq: 2, icon: '📢' },
+    { id: 6, name: 'Đường bay mới', cost: 1000000, profit: 900000, levelReq: 3, icon: '🌏' },
+    { id: 7, name: 'Sân bay riêng', cost: 5000000, profit: 5000000, levelReq: 4, icon: '🏢' },
+    { id: 8, name: 'Sao Hỏa', cost: 20000000, profit: 25000000, levelReq: 4, icon: '🪐' },
+];
 
-    setTimeout(() => {
-        toast.classList.remove('toast-enter');
-        toast.classList.add('toast-exit');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
+// 📋 CẤU HÌNH NHIỆM VỤ
+const TASKS = [
+    { 
+        id: 1, 
+        name: 'Tham gia Kênh Thông báo', 
+        reward: 25000, 
+        icon: '📢', 
+        type: 'tele', // Đặt loại là tele
+        link: 'https://t.me/vienduatin', 
+        channelId: '@vienduatin' // Server sẽ dùng cái này để check
+    },
+    { 
+        id: 2, 
+        name: 'Tham gia Nhóm Chat', 
+        reward: 25000, 
+        icon: '👥', 
+        type: 'tele', 
+        link: 'https://t.me/BAOAPPMIENPHI22', 
+        channelId: '@BAOAPPMIENPHI22' 
+    },
+    { 
+        id: 3, 
+        name: 'Intro Like Channel', 
+        reward: 25000, 
+        icon: '📢', 
+        type: 'tele', // Đặt loại là tele
+        link: 'https://t.me/IntroLikeChannel', 
+        channelId: '@IntroLikeChannel' // Server sẽ dùng cái này để check
+    },
+    { 
+        id: 4, 
+        name: 'Cộng Đồng Intro Like', 
+        reward: 25000, 
+        icon: '👥', 
+        type: 'tele', 
+        link: 'https://t.me/CongDongIntroLike', 
+        channelId: '@CongDongIntroLike' 
+    },
+    { id: 5, name: 'Mời 5 bạn bè', reward: 500000, icon: '🤝', type: 'invite', count: 5 },
+    { id: 6, name: 'Mời 10 bạn bè', reward: 1000000, icon: '🤝', type: 'invite', count: 10 },
+    { id: 7, name: 'Mời 20 bạn bè', reward: 2500000, icon: '🤝', type: 'invite', count: 20 },
+    { id: 8, name: 'Mời 50 bạn bè', reward: 7000000, icon: '🤝', type: 'invite', count: 50 },
+    { id: 9, name: 'Mời 100 bạn bè', reward: 15000000, icon: '🤝', type: 'invite', count: 100 },
+];
 
-// Hàm xoay nút (Loading)
-const setLoading = (btn, isLoading) => {
-    if (!btn) return;
-    if (isLoading) {
-        if (!btn.dataset.html) btn.dataset.html = btn.innerHTML; // Lưu nội dung cũ
-        btn.disabled = true;
-        btn.style.opacity = '0.8';
-        btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>`;
-        lucide.createIcons();
-    } else {
-        btn.disabled = false;
-        btn.style.opacity = '1';
-        if (btn.dataset.html) btn.innerHTML = btn.dataset.html; // Trả lại nội dung cũ
-        lucide.createIcons();
-    }
-};
-// =========================================
-// 2. LOGIC GAME & APP 
-// =========================================
+const TASK_COOLDOWN = 15 * 60 * 1000; // 15 Phút
 
-
+// 🎨 SVG RESOURCES
 const SVG_PLANE = `
     <svg viewBox="0 0 120 40" fill="none" class="w-16 h-6 drop-shadow-md">
         <rect class="jet-trail" x="0" y="24" width="0" height="2" fill="rgba(255,255,255,0.6)" rx="1" />
@@ -245,75 +141,145 @@ const HTML_LIGHTHOUSE = `
     </div>
 `;
 
-const LEVEL_THRESHOLDS = [
-    { name: 'Tập sự', threshold: 0 },
-    { name: 'Cơ phó', threshold: 500000 },
-    { name: 'Cơ trưởng', threshold: 5000000 },
-    { name: 'Phi hành gia', threshold: 50000000 },
-    { name: 'Sao Hỏa', threshold: 500000000 }
-];
-const DAILY_REWARDS = [5000, 5000, 5500, 5000, 10000, 5000, 5000, 10000, 5000, 30000];
-const INVESTMENT_CARDS = [
-    { id: 1, name: 'Vé xe buýt', cost: 1000, profit: 400, levelReq: 0, icon: '🚌' },
-    { id: 2, name: 'Chỗ gửi xe', cost: 5000, profit: 2500, levelReq: 0, icon: '🅿️' },
-    { id: 3, name: 'Suất ăn', cost: 10000, profit: 6000, levelReq: 1, icon: '🍱' },
-    { id: 4, name: 'Hàng miễn thuế', cost: 50000, profit: 35000, levelReq: 2, icon: '🛍️' },
-    { id: 5, name: 'Quảng cáo', cost: 200000, profit: 160000, levelReq: 2, icon: '📢' },
-    { id: 6, name: 'Đường bay mới', cost: 1000000, profit: 900000, levelReq: 3, icon: '🌏' },
-    { id: 7, name: 'Sân bay riêng', cost: 5000000, profit: 5000000, levelReq: 4, icon: '🏢' },
-    { id: 8, name: 'Sao Hỏa', cost: 20000000, profit: 25000000, levelReq: 4, icon: '🪐' },
-];
+// =============================================================================
+// REGION 2: SYSTEM & UTILS (INIT, HELPER)
+// =============================================================================
 
-const TASKS = [
-    { 
-        id: 1, 
-        name: 'Tham gia Kênh Thông báo', 
-        reward: 25000, 
-        icon: '📢', 
-        type: 'tele', // Đặt loại là tele
-        link: 'https://t.me/vienduatin', 
-        channelId: '@vienduatin' // Server sẽ dùng cái này để check
-    },
-    { 
-        id: 2, 
-        name: 'Tham gia Nhóm Chat', 
-        reward: 25000, 
-        icon: '👥', 
-        type: 'tele', 
-        link: 'https://t.me/BAOAPPMIENPHI22', 
-        channelId: '@BAOAPPMIENPHI22' 
-    },
-    { 
-        id: 3, 
-        name: 'Intro Like Channel', 
-        reward: 25000, 
-        icon: '📢', 
-        type: 'tele', // Đặt loại là tele
-        link: 'https://t.me/IntroLikeChannel', 
-        channelId: '@IntroLikeChannel' // Server sẽ dùng cái này để check
-    },
-    { 
-        id: 4, 
-        name: 'Cộng Đồng Intro Like', 
-        reward: 25000, 
-        icon: '👥', 
-        type: 'tele', 
-        link: 'https://t.me/CongDongIntroLike', 
-        channelId: '@CongDongIntroLike' 
-    },
-    { id: 5, name: 'Mời 5 bạn bè', reward: 500000, icon: '🤝', type: 'invite', count: 5 },
-    { id: 6, name: 'Mời 10 bạn bè', reward: 1000000, icon: '🤝', type: 'invite', count: 10 },
-    { id: 7, name: 'Mời 20 bạn bè', reward: 2500000, icon: '🤝', type: 'invite', count: 20 },
-    { id: 8, name: 'Mời 50 bạn bè', reward: 7000000, icon: '🤝', type: 'invite', count: 50 },
-    { id: 9, name: 'Mời 100 bạn bè', reward: 15000000, icon: '🤝', type: 'invite', count: 100 },
-];
+// Tailwind Config
+tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                bg: '#0b0b15',          // Nền tối hơn, sâu hơn
+                surface: '#1c1c2e',     // Màu nền card
+                glass: 'rgba(30, 30, 46, 0.7)', // Hiệu ứng kính
+                primary: '#3b82f6',
+                accent: '#eab308',
+            },
+            fontFamily: {
+                sans: ['ui-sans-serif', 'system-ui', 'sans-serif']
+            },
+            animation: {
+                'spin-fast': 'spin 0.7s linear infinite',
+            }
+        }
+    }
+}
 
-// Biến toàn cục (System)
+// Khởi tạo Telegram WebApp
+const tg = window.Telegram.WebApp;
+const API_BASE = '/api'; // Đường dẫn gốc của API Server
+
+try {
+    tg.expand(); // Mở full màn hình
+    tg.disableVerticalSwipes(); // Chống vuốt dọc tắt app (quan trọng cho game)
+    tg.enableClosingConfirmation(); // Hỏi lại trước khi đóng app
+    
+    // Chỉnh màu Header của Telegram cho trùng màu game luôn
+    tg.setHeaderColor('#0f0f1a'); 
+    tg.setBackgroundColor('#0f0f1a');
+} catch (e) {
+    console.log("Đang chạy ngoài Telegram hoặc phiên bản cũ");
+}
+
+// Chèn CSS động cho Toast
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+    .toast-exit { animation: fadeOut 0.3s ease-out forwards; }
+`;
+document.head.appendChild(styleSheet);
+
+// Helper: Headers & Auth
+const getHeaders = () => {
+    return {
+        'Content-Type': 'application/json',
+        'x-init-data': tg.initData // Server sẽ check cái này
+    };
+};
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('en-US').format(Math.floor(num));
+}
+
+// Helper: Lấy giờ chuẩn Server
+function getNow() {
+    return Date.now() + serverTimeOffset;
+}
+
+// Helper: Notification Toast
+function showNotification(msg, type = 'success') {
+    let box = document.getElementById('toast-box');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'toast-box';
+        box.className = 'fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none';
+        document.body.appendChild(box);
+    }
+
+    const toast = document.createElement('div');
+    const bg = type === 'success' ? 'bg-emerald-500' : 'bg-rose-500';
+    const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+    
+    toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 min-w-[220px] pointer-events-auto toast-enter border-2 border-white/20`;
+    toast.innerHTML = `
+        <i data-lucide="${icon}" class="w-5 h-5"></i>
+        <span class="font-bold text-sm drop-shadow-md">${msg}</span>
+    `;
+
+    box.appendChild(toast);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        toast.classList.remove('toast-enter');
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Helper: Loading Button State
+const setLoading = (btn, isLoading) => {
+    if (!btn) return;
+    if (isLoading) {
+        if (!btn.dataset.html) btn.dataset.html = btn.innerHTML; // Lưu nội dung cũ
+        btn.disabled = true;
+        btn.style.opacity = '0.8';
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>`;
+        lucide.createIcons();
+    } else {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        if (btn.dataset.html) btn.innerHTML = btn.dataset.html; // Trả lại nội dung cũ
+        lucide.createIcons();
+    }
+};
+
+window.openModal = (id) => { document.getElementById(id).classList.add('open'); }
+window.closeModal = (id) => {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+
+    modal.classList.remove('open');
+
+    // 🔥 RESET TRẠNG THÁI BOOST KHI ĐÓNG
+    if (id === 'modal-boost') {
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+    }
+};
+
+// =============================================================================
+// REGION 3: GLOBAL STATE
+// =============================================================================
+
+let gameToken = null;       // Token phiên chơi
 let currentUserUID = null;
-let serverTimeOffset = 0; // 🕒 Mới: Biến lệch giờ Server
-let socialDataCache = null; // 💾 Mới: Cache để tránh gọi API xã hội liên tục
+let serverTimeOffset = 0;   // 🕒 Mới: Biến lệch giờ Server
+let socialDataCache = null; // 💾 Mới: Cache
 
-// Cập nhật lại Object State
+// State Object chính
 let state = {
     balance: 0,
     diamond: 0,
@@ -326,172 +292,154 @@ let state = {
     nextRefillAt: 0, // timestamp ms – server authoritative
     investments: {}, 
     
-    // Data Social (Sẽ được nạp khi bấm tab Nhiệm vụ)
+    // Data Social
     completedTasks: [],
     dailyStreak: 0,
     lastDailyClaim: 0,
-    isClaimedToday: false, // ✅ Mới: Cờ check điểm danh trong ngày
+    isClaimedToday: false, // ✅ Mới: Cờ check điểm danh
     friendsList: [],
     
-    // Data History (Sẽ được nạp khi bấm tab Rút tiền)
+    // Data History
     withdrawHistory: []
 };
 
-// Helper: Lấy giờ chuẩn Server (thay vì giờ điện thoại)
-function getNow() {
-    return Date.now() + serverTimeOffset;
-}
-
+// Game Loop & UI Variables
+let loopInterval;
+let lastUserSyncAt = 0;
 let lastPlanePos = { x: 5, y: 7 };
 let currentDisplayBalance = 0;
 let isTransactionPending = false;
-function loadData() {
-    // ❌ Không dùng localStorage nữa
-    // State sẽ được server trả về sau khi login
-    currentDisplayBalance = state.balance;
-    updateUI();
+let currentSelectedTask = null;
+
+// Flight Variables
+let flightInterval;
+let flightStart;
+let crashTime;
+let isFlying = false;
+let flightPhase = 'IDLE'; 
+let isCashingOut = false; // 🔒 Biến khóa ngầm
+const MIN_RESET_DELAY = 3000; // ⏱️ Thời gian chờ tối thiểu (3s)
+let fallingInterval; 
+let targetMaxAngle = -45;
+let checkingInProgress = false;
+let flightPayload = null;    
+let checkTimer = null;      
+let flightEndTime = 0;      
+let currentRunMoney = 0;   
+let flightResolved = false; 
+let ignoreCheckResult = false; 
+let visualEnergy = 0;
+
+// Boost Shop Variables
+let isEditingBoostInput = false;
+let openedBoostPanel = null; // 'buy_energy' | 'gold_to_diamond' | null
+
+// =============================================================================
+// REGION 4: AD CONTROLLER (QUẢNG CÁO)
+// =============================================================================
+
+let EnergyAdController; // Điều khiển QC Năng lượng
+let FlyAdController;    // Điều khiển QC Bay
+let DailyAdController;
+
+// Khởi tạo 2 bộ điều khiển riêng biệt
+if (window.Adsgram) {
+    EnergyAdController = window.Adsgram.init({ blockId: ID_ENERGY_AD });
+    FlyAdController    = window.Adsgram.init({ blockId: ID_FLY_AD });
+    DailyAdController  = window.Adsgram.init({ blockId: ID_DAILY_AD });
 }
 
-function formatNumber(num) {
-    return new Intl.NumberFormat('en-US').format(Math.floor(num));
-}
-
-function animateBalance(target) {
-    if (target <= currentDisplayBalance) {
-        currentDisplayBalance = target;
-        return;
-    }
-
-    const start = currentDisplayBalance;
-    const diff = target - start;
-    const duration = 700;
-
-    let startTime = null;
-
-    function step(ts) {
-        if (!startTime) startTime = ts;
-        const p = Math.min((ts - startTime) / duration, 1);
-        const ease = 1 - Math.pow(1 - p, 3);
-
-        currentDisplayBalance = Math.floor(start + diff * ease);
-
-        document.getElementById('balance-display').innerText =
-            formatNumber(currentDisplayBalance);
-        document.getElementById('mini-balance-text').innerText =
-            formatNumber(currentDisplayBalance);
-        document.getElementById('withdraw-balance').innerText =
-            formatNumber(currentDisplayBalance);
-
-        if (p < 1) requestAnimationFrame(step);
-    }
-
-    requestAnimationFrame(step);
-}
-
-let loopInterval;
-let lastUserSyncAt = 0;
-
-function startLoops() {
-    if (loopInterval) return;
-
-    renderGameScene('IDLE');
-
-    loopInterval = setInterval(() => {
-        // ⛔ CHỈ HỒI KHI TRẠNG THÁI LÀ IDLE
-        if ((flightPhase !== 'IDLE') && (flightPhase !== 'FLYADS')) return;
-
-        const now = Date.now();
-
-        // 🔄 CẬP NHẬT ĐỒNG HỒ ĐẾM NGƯỢC TRONG MODAL (MỚI)
-        // Nếu modal boost đang mở -> Vẽ lại để cập nhật thời gian chờ
-        const modalBoost = document.getElementById('modal-boost');
-        if (modalBoost && modalBoost.classList.contains('open')) {
-            renderBoosts(); 
+// 1️⃣ HÀM CHO NÚT HỒI NĂNG LƯỢNG (Khắt khe)
+async function showEnergyAd() {
+    return new Promise((resolve, reject) => {
+        // Adsgram chưa sẵn sàng
+        if (!EnergyAdController) {
+            reject(new Error('Quảng cáo chưa sẵn sàng, vui lòng thử lại sau'));
+            return;
         }
 
-        // ⛔ KHÔNG regen ngay sau khi vừa sync user
-        if (now - lastUserSyncAt < 1200) return;
-
-        if (state.energy < state.baseMaxEnergy) {
-            state.energy = Math.min(
-                state.energy + 3,
-                state.baseMaxEnergy
-            );
-
-            document.getElementById('energy-display').innerText =
-                Math.floor(state.energy);
-        }
-        if (!isTransactionPending) {
-            renderInvestments();
-        }
-
-    }, 1000);
-}
-function updateUI() {
-    animateBalance(state.balance);
-    const diamondEl = document.getElementById('diamond-display');
-    if (diamondEl) {
-        // formatNumber giúp hiển thị đẹp (ví dụ 1,000 thay vì 1000)
-        diamondEl.innerText = formatNumber(state.diamond || 0); 
-    }
-    // ===== LEVEL TỪ SERVER =====
-    const levelIdx = Math.max(0, Math.min(
-        LEVEL_THRESHOLDS.length - 1,
-        state.level - 1
-    ));
-
-    const currentLevel = LEVEL_THRESHOLDS[levelIdx];
-    const nextLevel = LEVEL_THRESHOLDS[levelIdx + 1];
-
-    document.getElementById('level-name').innerText = currentLevel.name;
-    document.getElementById('level-idx').innerText =
-        `Lv ${state.level}/${LEVEL_THRESHOLDS.length}`;
-
-    if (nextLevel) {
-        const percent = Math.min(
-            100,
-            Math.max(0, (state.exp / nextLevel.threshold) * 100)
-        );
-
-        document.getElementById('level-progress-bar').style.width = `${percent}%`;
-        document.getElementById('level-progress-text').innerText =
-            `${formatNumber(state.exp)} / ${formatNumber(nextLevel.threshold)}`;
-    } else {
-        document.getElementById('level-progress-bar').style.width = '100%';
-        document.getElementById('level-progress-text').innerText = 'MAX';
-    }
-
-    // ===== ENERGY =====
-    document.getElementById('energy-display').innerText = Math.floor(state.energy);
-    document.getElementById('max-energy-display').innerText = state.baseMaxEnergy;
-
-    // ===== TAP =====
-    document.getElementById('tap-value').innerText = `+${state.tapValue}`;
-
-    // ===== INVESTMENTS =====
-    const activeCount = Object.keys(state.investments).length;
-    let pending = 0;
-    for (let id in state.investments) {
-        const card = INVESTMENT_CARDS.find(c => c.id == id);
-        if (card) pending += card.cost + card.profit;
-    }
-
-    document.getElementById('active-investments').innerText = `${activeCount} gói`;
-    document.getElementById('pending-return').innerText = `+${formatNumber(pending)}`;
-    document.getElementById('mine-active-count').innerText = `${activeCount} gói`;
-    document.getElementById('mine-pending-return').innerText = `+${formatNumber(pending)}`;
-    document.getElementById('friend-count').innerText = state.friendsList.length;
-
-    if (!isEditingBoostInput) {
-        renderBoosts();
-    }
-
-    renderTasks();
-    renderFriends();
-    renderWithdrawHistory();
-    renderDaily();
+        EnergyAdController.show()
+            .then((result) => {
+                // BẮT BUỘC xem hết
+                if (result && result.done === true) {
+                    resolve(true);
+                } else {
+                    reject(new Error('Bạn cần xem hết quảng cáo để hồi năng lượng'));
+                }
+            })
+            .catch(() => {
+                reject(new Error('Quảng cáo gặp lỗi, vui lòng thử lại sau'));
+            });
+    });
 }
 
+async function showDaily() {
+    return new Promise((resolve, reject) => {
+        // Adsgram chưa sẵn sàng
+        if (!DailyAdController) {
+            reject(new Error('Quảng cáo chưa sẵn sàng, vui lòng thử lại sau'));
+            return;
+        }
+
+        DailyAdController.show()
+            .then((result) => {
+                // BẮT BUỘC xem hết
+                if (result && result.done === true) {
+                    resolve(true);
+                } else {
+                    reject(new Error('Bạn cần xem hết quảng cáo để điểm danh'));
+                }
+            })
+            .catch(() => {
+                reject(new Error('Quảng cáo gặp lỗi, vui lòng thử lại sau'));
+            });
+    });
+}
+
+// 2️⃣ HÀM CHO NÚT BAY (Dễ tính)
+async function showFlyAd() {
+    return new Promise((resolve) => {
+        if (FlyAdController) {
+            FlyAdController.show().then((result) => {
+                // Với Interstitial, dù xem hết hay tắt ngang (result.done = false)
+                // THÌ VẪN CHO BAY. Mục đích là hiện QC thôi.
+                resolve(true); 
+            }).catch((err) => {
+                console.warn("Lỗi QC Bay:", err);
+                resolve(true); // Lỗi cũng cho bay luôn
+            });
+        } else {
+            resolve(true);
+        }
+    });
+}
+
+// =============================================================================
+// REGION 5: CORE GAME LOGIC (GAME ENGINE)
+// =============================================================================
+
+function calcAngle() {
+    const container = document.getElementById('game-container');
+    if(container) {
+        const { width, height } = container.getBoundingClientRect();
+        if(width && height) targetMaxAngle = -Math.atan(height/width) * (180/Math.PI);
+    }
+}
+window.addEventListener('resize', calcAngle);
+setTimeout(calcAngle, 100);
+
+// Nút Action Chính (Cất cánh / Nhảy dù)
+document.getElementById('main-action-btn').addEventListener('click', () => {
+    const btn = document.getElementById('main-action-btn');
+    if (btn.innerText.includes('CẤT CÁNH')) {
+        if (state.energy < 10) return;
+        startFlight();
+    } else if (btn.innerText.includes('NHẢY DÙ')) {
+        cashOut();
+    }
+});
+
+// Hàm Render Cảnh Game (Background, Máy bay...)
 function renderGameScene(status, x = 0, y = 0) {
     const container = document.getElementById('game-container');
     
@@ -656,106 +604,7 @@ function updatePlaneVisuals(elapsed, status) {
     }
 }
 
-// Add CSS for star if missing in HTML block (It is in head style)
-
-// ------------------------------------------
-// 🔥 LOGIC CHUYỂN TAB & LAZY LOAD (MỚI)
-// ------------------------------------------
-async function switchTab(tabName) {
-    // 1. UI Logic (Giữ nguyên)
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-    
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(`nav-${tabName}`).classList.add('active');
-    
-    const miniBal = document.getElementById('mini-balance');
-    const miniDia = document.getElementById('mini-diamond');
-
-    // ✅ 💎 LUÔN HIỆN
-    miniDia.classList.remove('hidden');
-    miniDia.classList.add('flex');
-
-    // ✅ 💰 CHỈ ẨN Ở TAB BAY
-    if (tabName === 'exchange') {
-        miniBal.classList.add('hidden');
-        miniBal.classList.remove('flex');
-    } else {
-        miniBal.classList.remove('hidden');
-        miniBal.classList.add('flex');
-    }
-    
-    // ============================================================
-    // 🔥 LOGIC GỌI API: CHỈ GỌI USER KHI VÀO TAB BAY
-    // ============================================================
-    
-    if (tabName === 'exchange') {
-        loadUserInfo({ silent: true }); // Sync lại tiền/năng lượng cho chắc
-    }
-
-    // ============================================================
-    // RENDERING (Dữ liệu đã có sẵn trong state từ lúc initApp)
-    // ============================================================
-    
-    if (tabName === 'mine') {
-        renderInvestments();
-    }
-    
-    if (tabName === 'quests') { 
-        renderTasks(); 
-        renderDaily(); 
-    }
-    
-    if (tabName === 'friends') {
-        renderFriends();
-    }
-
-    if (tabName === 'withdraw') {
-        renderWithdrawHistory();
-    }
-}
-
-
-let flightInterval;
-let flightStart;
-let crashTime;
-let isFlying = false;
-let flightPhase = 'IDLE'; 
-let isCashingOut = false; // 🔒 Biến khóa ngầm
-const MIN_RESET_DELAY = 3000; // ⏱️ Thời gian chờ tối thiểu (3s) cho mọi trường hợp
-let fallingInterval; 
-let targetMaxAngle = -45;
-let checkingInProgress = false;
-let flightPayload = null;   
-let checkTimer = null;     
-let flightEndTime = 0;     
-let currentRunMoney = 0;  
-let flightResolved = false; 
-let ignoreCheckResult = false; 
-let visualEnergy = 0;
-let isEditingBoostInput = false;
-let openedBoostPanel = null; // 'buy_energy' | 'gold_to_diamond' | null
-
-function calcAngle() {
-    const container = document.getElementById('game-container');
-    if(container) {
-        const { width, height } = container.getBoundingClientRect();
-        if(width && height) targetMaxAngle = -Math.atan(height/width) * (180/Math.PI);
-    }
-}
-window.addEventListener('resize', calcAngle);
-setTimeout(calcAngle, 100);
-
-document.getElementById('main-action-btn').addEventListener('click', () => {
-    const btn = document.getElementById('main-action-btn');
-    if (btn.innerText.includes('CẤT CÁNH')) {
-        if (state.energy < 10) return;
-        startFlight();
-    } else if (btn.innerText.includes('NHẢY DÙ')) {
-        cashOut();
-    }
-});
-
+// Hàm Bắt đầu bay
 async function startFlight() {
     // 1. Chặn nếu không phải đang rảnh (IDLE)
     if (flightPhase !== 'IDLE') return;
@@ -878,6 +727,7 @@ async function startFlight() {
     }, 700);
 }
 
+// Kiểm tra kết quả
 async function checkFlightResult() {
     if (!flightPayload || flightResolved || ignoreCheckResult) return;
     if (checkingInProgress) return;
@@ -939,6 +789,7 @@ function scheduleNextCheck() {
     setTimeout(checkFlightResult, 700);
 }
 
+// Xử lý Auto Jump (Thành công)
 async function doAutoJump(payload) {
     ignoreCheckResult = true;
     flightResolved = true;
@@ -1004,6 +855,7 @@ async function doAutoJump(payload) {
     resetGame(); // resetGame sẽ lo việc sync
 }
 
+// Xử lý Nổ (Crash)
 function crash(lostAmount = 0) {
     clearInterval(flightInterval);
     clearInterval(checkTimer);
@@ -1029,6 +881,7 @@ function crash(lostAmount = 0) {
     setTimeout(resetGame, MIN_RESET_DELAY);
 }
 
+// Xử lý Nhảy dù (Cash Out)
 async function cashOut() {
     // 1. CHẶN SPAM
     if (!isFlying || flightResolved || isCashingOut) return;
@@ -1113,6 +966,7 @@ async function cashOut() {
     }
 }
 
+// Reset Game
 async function resetGame() {
     clearInterval(fallingInterval);
     clearInterval(flightInterval);
@@ -1140,6 +994,155 @@ async function resetGame() {
 
     flightPhase = 'IDLE'; 
 }
+
+// =============================================================================
+// REGION 6: MAIN UI LOOP & UPDATE
+// =============================================================================
+
+function loadData() {
+    // ❌ Không dùng localStorage nữa
+    // State sẽ được server trả về sau khi login
+    currentDisplayBalance = state.balance;
+    updateUI();
+}
+
+function animateBalance(target) {
+    if (target <= currentDisplayBalance) {
+        currentDisplayBalance = target;
+        return;
+    }
+
+    const start = currentDisplayBalance;
+    const diff = target - start;
+    const duration = 700;
+
+    let startTime = null;
+
+    function step(ts) {
+        if (!startTime) startTime = ts;
+        const p = Math.min((ts - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+
+        currentDisplayBalance = Math.floor(start + diff * ease);
+
+        document.getElementById('balance-display').innerText =
+            formatNumber(currentDisplayBalance);
+        document.getElementById('mini-balance-text').innerText =
+            formatNumber(currentDisplayBalance);
+        document.getElementById('withdraw-balance').innerText =
+            formatNumber(currentDisplayBalance);
+
+        if (p < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+}
+
+function startLoops() {
+    if (loopInterval) return;
+
+    renderGameScene('IDLE');
+
+    loopInterval = setInterval(() => {
+        // ⛔ CHỈ HỒI KHI TRẠNG THÁI LÀ IDLE
+        if ((flightPhase !== 'IDLE') && (flightPhase !== 'FLYADS')) return;
+
+        const now = Date.now();
+
+        // 🔄 CẬP NHẬT ĐỒNG HỒ ĐẾM NGƯỢC TRONG MODAL (MỚI)
+        // Nếu modal boost đang mở -> Vẽ lại để cập nhật thời gian chờ
+        const modalBoost = document.getElementById('modal-boost');
+        if (modalBoost && modalBoost.classList.contains('open')) {
+            renderBoosts(); 
+        }
+
+        // ⛔ KHÔNG regen ngay sau khi vừa sync user
+        if (now - lastUserSyncAt < 1200) return;
+
+        if (state.energy < state.baseMaxEnergy) {
+            state.energy = Math.min(
+                state.energy + 3,
+                state.baseMaxEnergy
+            );
+
+            document.getElementById('energy-display').innerText =
+                Math.floor(state.energy);
+        }
+        if (!isTransactionPending) {
+            renderInvestments();
+        }
+
+    }, 1000);
+}
+
+function updateUI() {
+    animateBalance(state.balance);
+    const diamondEl = document.getElementById('diamond-display');
+    if (diamondEl) {
+        // formatNumber giúp hiển thị đẹp (ví dụ 1,000 thay vì 1000)
+        diamondEl.innerText = formatNumber(state.diamond || 0); 
+    }
+    // ===== LEVEL TỪ SERVER =====
+    const levelIdx = Math.max(0, Math.min(
+        LEVEL_THRESHOLDS.length - 1,
+        state.level - 1
+    ));
+
+    const currentLevel = LEVEL_THRESHOLDS[levelIdx];
+    const nextLevel = LEVEL_THRESHOLDS[levelIdx + 1];
+
+    document.getElementById('level-name').innerText = currentLevel.name;
+    document.getElementById('level-idx').innerText =
+        `Lv ${state.level}/${LEVEL_THRESHOLDS.length}`;
+
+    if (nextLevel) {
+        const percent = Math.min(
+            100,
+            Math.max(0, (state.exp / nextLevel.threshold) * 100)
+        );
+
+        document.getElementById('level-progress-bar').style.width = `${percent}%`;
+        document.getElementById('level-progress-text').innerText =
+            `${formatNumber(state.exp)} / ${formatNumber(nextLevel.threshold)}`;
+    } else {
+        document.getElementById('level-progress-bar').style.width = '100%';
+        document.getElementById('level-progress-text').innerText = 'MAX';
+    }
+
+    // ===== ENERGY =====
+    document.getElementById('energy-display').innerText = Math.floor(state.energy);
+    document.getElementById('max-energy-display').innerText = state.baseMaxEnergy;
+
+    // ===== TAP =====
+    document.getElementById('tap-value').innerText = `+${state.tapValue}`;
+
+    // ===== INVESTMENTS =====
+    const activeCount = Object.keys(state.investments).length;
+    let pending = 0;
+    for (let id in state.investments) {
+        const card = INVESTMENT_CARDS.find(c => c.id == id);
+        if (card) pending += card.cost + card.profit;
+    }
+
+    document.getElementById('active-investments').innerText = `${activeCount} gói`;
+    document.getElementById('pending-return').innerText = `+${formatNumber(pending)}`;
+    document.getElementById('mine-active-count').innerText = `${activeCount} gói`;
+    document.getElementById('mine-pending-return').innerText = `+${formatNumber(pending)}`;
+    document.getElementById('friend-count').innerText = state.friendsList.length;
+
+    if (!isEditingBoostInput) {
+        renderBoosts();
+    }
+
+    renderTasks();
+    renderFriends();
+    renderWithdrawHistory();
+    renderDaily();
+}
+
+// =============================================================================
+// REGION 7: FEATURE - INVESTMENTS (ĐẦU TƯ)
+// =============================================================================
 
 function renderInvestments() {
     const container = document.getElementById('investment-list');
@@ -1237,7 +1240,6 @@ function renderInvestments() {
     lucide.createIcons();
 }
 
-// Thêm tham số btnElement (chính là 'this' từ HTML)
 window.buyInvestment = async (id, btn) => {
     // Nếu nút đang disable hoặc không tồn tại thì bỏ qua
     if (!btn || btn.disabled) return;
@@ -1320,7 +1322,10 @@ window.claimInvestment = async (id, btn) => {
     }
 };
 
-let currentSelectedTask = null;
+// =============================================================================
+// REGION 8: FEATURE - TASKS (NHIỆM VỤ)
+// =============================================================================
+
 function renderTasks() {
     const container = document.getElementById('tasks-list');
     if (!container) return;
@@ -1391,13 +1396,6 @@ function renderTasks() {
     
     lucide.createIcons();
 }
-// =========================================
-// 📺 RENDER ADSGRAM TASK (VIP)
-// =========================================
-// =========================================
-// 📺 RENDER ADSGRAM TASK (VIP) - ẨN KHI LÀM XONG
-// =========================================
-const TASK_COOLDOWN = 15 * 60 * 1000; // 15 Phút
 
 function renderAdsgramTaskBlock(containerId) {
     const container = document.getElementById(containerId);
@@ -1517,7 +1515,6 @@ window.doTaskAction = () => {
     }
 };
 
-// --- LOGIC KIỂM TRA NHIỆM VỤ (NÂNG CẤP) ---
 window.checkTaskAction = async () => {
     const btn = document.getElementById('task-btn-check');
     if (!btn || btn.disabled) return;
@@ -1564,7 +1561,10 @@ window.checkTaskAction = async () => {
     }
 };
 
-// --- ĐIỂM DANH (LOGIC MỚI) ---
+// =============================================================================
+// REGION 9: FEATURE - DAILY (ĐIỂM DANH)
+// =============================================================================
+
 function renderDaily() {
     const container = document.getElementById('daily-checkin-list');
     if (!container) return;
@@ -1603,7 +1603,6 @@ function renderDaily() {
             <button ${onClick} class="${className}" ${(isCurrent && canClaim) ? '' : 'disabled'}>
                 <span class="text-[9px] text-gray-400 mb-1">Ngày ${day}</span>
 
-                <!-- ICON (CHỈ CHỖ NÀY THAY ĐỔI) -->
                 <div class="mb-1 text-2xl">
                     ${rewardIcon}
                 </div>
@@ -1681,6 +1680,9 @@ window.claimDaily = async (idx, btn) => {
     }
 };
 
+// =============================================================================
+// REGION 10: FEATURE - FRIENDS (BẠN BÈ)
+// =============================================================================
 
 function renderFriends() {
     // ⛔ chưa có UID thì thôi
@@ -1719,18 +1721,9 @@ window.copyInviteLink = () => {
     showNotification('Đã sao chép link mời!', 'success');
 };
 
-
-// Danh sách tên đầy đủ ngân hàng
-const BANK_FULL_NAMES = {
-    'MB': 'MB Bank',
-    'VCB': 'Vietcombank',
-    'TCB': 'Techcombank',
-    'ACB': 'Ngân hàng ACB',
-    'ICB': 'VietinBank',
-    'BIDV': 'BIDV',
-    'TPB': 'TPBank',
-    'VPB': 'VPBank'
-};
+// =============================================================================
+// REGION 11: FEATURE - WITHDRAW (RÚT TIỀN)
+// =============================================================================
 
 function renderWithdrawHistory() {
     const container = document.getElementById('withdraw-history');
@@ -1784,9 +1777,6 @@ function renderWithdrawHistory() {
     });
 }
 
-
-
-// Thêm tham số btn để nhận nút bấm
 // Thêm tham số btn để nhận nút bấm
 window.submitWithdraw = async (btn) => {
     // Fallback nếu quên sửa HTML
@@ -1857,12 +1847,16 @@ window.submitWithdraw = async (btn) => {
         if (btn) setLoading(btn, false);
     }
 };
+
 document.getElementById('withdraw-amount').addEventListener('input', (e) => {
     const val = e.target.value;
     document.getElementById('withdraw-rate').innerText = `Quy đổi: ${formatNumber(val * 0.001)} VNĐ`;
 });
 
-// Thay thế hàm renderBoosts cũ bằng hàm này
+// =============================================================================
+// REGION 12: FEATURE - BOOSTS & SHOP (MUA NĂNG LƯỢNG / ĐỔI VÀNG)
+// =============================================================================
+
 function renderBoosts(force = false) {
     if (isEditingBoostInput && !force) return;
 
@@ -1999,121 +1993,6 @@ function renderBoosts(force = false) {
     lucide.createIcons();
 }
 
-// 2. Logic Preview Mua Năng Lượng
-window.updateBuyEnergyPreview = () => {
-    const input = document.getElementById('buy-energy-input');
-    const btn = document.getElementById('buy-energy-confirm');
-    if (!input || !btn) return;
-
-    const diamondSpend = parseInt(input.value, 10);
-
-    // Min 100 KC
-    if (!diamondSpend || diamondSpend < 100) {
-        btn.innerText = 'Min 100 💎';
-        btn.disabled = true;
-        return;
-    }
-
-    // Check đủ tiền không
-    if (diamondSpend > state.diamond) {
-        btn.innerText = 'Thiếu 💎';
-        btn.disabled = true;
-        return;
-    }
-
-    // Tính toán: (KC / 100) * 1000
-    const energyGet = Math.floor(diamondSpend / 100) * 1000;
-
-    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
-    btn.disabled = false;
-};
-
-// 3. Logic Preview Đổi Vàng
-window.updateGoldToDiamondPreview = () => {
-    const input = document.getElementById('gold-to-diamond-input');
-    const btn = document.getElementById('gold-to-diamond-confirm');
-    if (!input || !btn) return;
-
-    const goldSpend = parseInt(input.value, 10);
-
-    // Min 1000 Vàng
-    if (!goldSpend || goldSpend < 1000) {
-        btn.innerText = 'Min 1000 💰';
-        btn.disabled = true;
-        return;
-    }
-
-    // Check đủ tiền không
-    if (goldSpend > state.balance) {
-        btn.innerText = 'Thiếu 💰';
-        btn.disabled = true;
-        return;
-    }
-
-    // Tính toán: (Vàng / 1000) * 100
-    const diamondGet = Math.floor(goldSpend / 1000) * 100;
-
-    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
-    btn.disabled = false;
-};
-// 2. Logic Preview Mua Năng Lượng
-window.updateBuyEnergyPreview = () => {
-    const input = document.getElementById('buy-energy-input');
-    const btn = document.getElementById('buy-energy-confirm');
-    if (!input || !btn) return;
-
-    const diamondSpend = parseInt(input.value, 10);
-
-    // Min 100 KC
-    if (!diamondSpend || diamondSpend < 100) {
-        btn.innerText = 'Min 100 💎';
-        btn.disabled = true;
-        return;
-    }
-
-    // Check đủ tiền không
-    if (diamondSpend > state.diamond) {
-        btn.innerText = 'Thiếu 💎';
-        btn.disabled = true;
-        return;
-    }
-
-    // Tính toán: (KC / 100) * 1000
-    const energyGet = Math.floor(diamondSpend / 100) * 1000;
-
-    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
-    btn.disabled = false;
-};
-
-// 3. Logic Preview Đổi Vàng
-window.updateGoldToDiamondPreview = () => {
-    const input = document.getElementById('gold-to-diamond-input');
-    const btn = document.getElementById('gold-to-diamond-confirm');
-    if (!input || !btn) return;
-
-    const goldSpend = parseInt(input.value, 10);
-
-    // Min 1000 Vàng
-    if (!goldSpend || goldSpend < 1000) {
-        btn.innerText = 'Min 1000 💰';
-        btn.disabled = true;
-        return;
-    }
-
-    // Check đủ tiền không
-    if (goldSpend > state.balance) {
-        btn.innerText = 'Thiếu 💰';
-        btn.disabled = true;
-        return;
-    }
-
-    // Tính toán: (Vàng / 1000) * 100
-    const diamondGet = Math.floor(goldSpend / 1000) * 100;
-
-    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
-    btn.disabled = false;
-};
-
 window.toggleBoostPanel = (key) => {
     if (openedBoostPanel === key) {
         // Bấm lại chính nó → đóng
@@ -2129,7 +2008,24 @@ window.toggleBoostPanel = (key) => {
     renderBoosts(true);
 };
 
+window.confirmBuyEnergy = (btn) => {
+    const input = document.getElementById('buy-energy-input');
+    if (!input) return;
 
+    const want = parseInt(input.value, 10);
+    if (!want || !want <= 0) return;
+
+    // Gắn data cho server dùng
+    btn.dataset.amount = want;
+
+    // 🔒 Đóng panel ngay để tránh double render
+    openedBoostPanel = null;
+    isEditingBoostInput = false;
+
+    applyBoost('buy_energy', btn);
+};
+
+// 2. Logic Preview Mua Năng Lượng (Phiên bản chính thức)
 window.updateBuyEnergyPreview = () => {
     const input = document.getElementById('buy-energy-input');
     const btn = document.getElementById('buy-energy-confirm');
@@ -2157,26 +2053,7 @@ window.updateBuyEnergyPreview = () => {
     btn.disabled = false;
 };
 
-
-
-window.confirmBuyEnergy = (btn) => {
-    const input = document.getElementById('buy-energy-input');
-    if (!input) return;
-
-    const want = parseInt(input.value, 10);
-    if (!want || want <= 0) return;
-
-    // Gắn data cho server dùng
-    btn.dataset.amount = want;
-
-    // 🔒 Đóng panel ngay để tránh double render
-    openedBoostPanel = null;
-    isEditingBoostInput = false;
-
-    applyBoost('buy_energy', btn);
-};
-
-
+// 3. Logic Preview Đổi Vàng (Phiên bản chính thức)
 window.updateGoldToDiamondPreview = () => {
     const input = document.getElementById('gold-to-diamond-input');
     const btn = document.getElementById('gold-to-diamond-confirm');
@@ -2200,7 +2077,7 @@ window.updateGoldToDiamondPreview = () => {
     btn.disabled = false;
 };
 
-
+// Hàm Apply Boost (Phiên bản chính thức)
 window.applyBoost = async (type, btn) => {
     if (!btn || btn.disabled) return;
     setLoading(btn, true);
@@ -2239,64 +2116,66 @@ window.applyBoost = async (type, btn) => {
     }
 };
 
+// =============================================================================
+// REGION 13: NAVIGATION, DATA SYNC & INIT
+// =============================================================================
 
+// Logic chuyển Tab
+async function switchTab(tabName) {
+    // 1. UI Logic (Giữ nguyên)
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(`nav-${tabName}`).classList.add('active');
+    
+    const miniBal = document.getElementById('mini-balance');
+    const miniDia = document.getElementById('mini-diamond');
 
-window.applyBoost = async (type, btn) => {
-    if (!btn || btn.disabled) return;
-    setLoading(btn, true);
+    // ✅ 💎 LUÔN HIỆN
+    miniDia.classList.remove('hidden');
+    miniDia.classList.add('flex');
 
-    try {
-        const payload = { type };
-
-        // ✅ GỬI AMOUNT
-        if (type === 'buy_energy' || type === 'gold_to_diamond') {
-            payload.amount = parseInt(btn.dataset.amount || 0);
-        }
-
-        const res = await fetch(`${API_BASE}/apply`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Thao tác thất bại');
-
-        showNotification('Thành công!', 'success');
-
-        await loadUserInfo({ silent: true });
-
-        openedBoostPanel = null;
-        isEditingBoostInput = false;
-
-        renderBoosts(true);
-        updateUI();
-
-    } catch (e) {
-        showNotification(e.message || 'Lỗi', 'error');
-    } finally {
-        setLoading(btn, false);
+    // ✅ 💰 CHỈ ẨN Ở TAB BAY
+    if (tabName === 'exchange') {
+        miniBal.classList.add('hidden');
+        miniBal.classList.remove('flex');
+    } else {
+        miniBal.classList.remove('hidden');
+        miniBal.classList.add('flex');
     }
-};
-
-
-window.openModal = (id) => { document.getElementById(id).classList.add('open'); }
-window.closeModal = (id) => {
-    const modal = document.getElementById(id);
-    if (!modal) return;
-
-    modal.classList.remove('open');
-
-    // 🔥 RESET TRẠNG THÁI BOOST KHI ĐÓNG
-    if (id === 'modal-boost') {
-        openedBoostPanel = null;
-        isEditingBoostInput = false;
+    
+    // ============================================================
+    // 🔥 LOGIC GỌI API: CHỈ GỌI USER KHI VÀO TAB BAY
+    // ============================================================
+    
+    if (tabName === 'exchange') {
+        loadUserInfo({ silent: true }); // Sync lại tiền/năng lượng cho chắc
     }
-};
 
-// =========================================
-// LOGIN & SYNC USER (SERVER AUTHORITATIVE)
-// =========================================
+    // ============================================================
+    // RENDERING (Dữ liệu đã có sẵn trong state từ lúc initApp)
+    // ============================================================
+    
+    if (tabName === 'mine') {
+        renderInvestments();
+    }
+    
+    if (tabName === 'quests') { 
+        renderTasks(); 
+        renderDaily(); 
+    }
+    
+    if (tabName === 'friends') {
+        renderFriends();
+    }
+
+    if (tabName === 'withdraw') {
+        renderWithdrawHistory();
+    }
+}
+
+// Hàm Load User Info
 async function loadUserInfo({ silent = false } = {}) {
     try {
         const res = await fetch(`${API_BASE}/user`, {
@@ -2406,7 +2285,7 @@ async function loadAuxData() {
     }
 }
 
-// Sửa lại initApp để gọi tất cả cùng lúc
+// Khởi tạo App
 async function initApp() {
     try {
         const user = tg.initDataUnsafe?.user;
@@ -2446,4 +2325,108 @@ window.onload = () => {
 
     // 🔥 LOGIN + SYNC USER
     initApp();
+};
+
+// =============================================================================
+// REGION 14: CODE DƯ THỪA / TRÙNG LẶP (ĐÃ TÁCH RIÊNG THEO YÊU CẦU)
+// =============================================================================
+// [GIẢI THÍCH]: Những hàm dưới đây đã tồn tại ở REGION 12 (phiên bản chính thức).
+// Do code gốc copy paste 2 lần nên tôi dời bản sao cũ xuống đây để không xoá code.
+// Các hàm này sẽ bị override bởi các hàm cùng tên ở trên.
+
+// 2. Logic Preview Mua Năng Lượng (Bản sao cũ)
+window.updateBuyEnergyPreview = () => {
+    const input = document.getElementById('buy-energy-input');
+    const btn = document.getElementById('buy-energy-confirm');
+    if (!input || !btn) return;
+
+    const diamondSpend = parseInt(input.value, 10);
+
+    // Min 100 KC
+    if (!diamondSpend || diamondSpend < 100) {
+        btn.innerText = 'Min 100 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (diamondSpend > state.diamond) {
+        btn.innerText = 'Thiếu 💎';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (KC / 100) * 1000
+    const energyGet = Math.floor(diamondSpend / 100) * 1000;
+
+    btn.innerText = `Mua (Nhận ${formatNumber(energyGet)} ⚡)`;
+    btn.disabled = false;
+};
+
+// 3. Logic Preview Đổi Vàng (Bản sao cũ)
+window.updateGoldToDiamondPreview = () => {
+    const input = document.getElementById('gold-to-diamond-input');
+    const btn = document.getElementById('gold-to-diamond-confirm');
+    if (!input || !btn) return;
+
+    const goldSpend = parseInt(input.value, 10);
+
+    // Min 1000 Vàng
+    if (!goldSpend || goldSpend < 1000) {
+        btn.innerText = 'Min 1000 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Check đủ tiền không
+    if (goldSpend > state.balance) {
+        btn.innerText = 'Thiếu 💰';
+        btn.disabled = true;
+        return;
+    }
+
+    // Tính toán: (Vàng / 1000) * 100
+    const diamondGet = Math.floor(goldSpend / 1000) * 100;
+
+    btn.innerText = `Đổi (Nhận ${formatNumber(diamondGet)} 💎)`;
+    btn.disabled = false;
+};
+
+// Hàm Apply Boost (Bản sao cũ)
+window.applyBoost = async (type, btn) => {
+    if (!btn || btn.disabled) return;
+    setLoading(btn, true);
+
+    try {
+        const payload = { type };
+
+        // ✅ GỬI AMOUNT
+        if (type === 'buy_energy' || type === 'gold_to_diamond') {
+            payload.amount = parseInt(btn.dataset.amount || 0);
+        }
+
+        const res = await fetch(`${API_BASE}/apply`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Thao tác thất bại');
+
+        showNotification('Thành công!', 'success');
+
+        await loadUserInfo({ silent: true });
+
+        openedBoostPanel = null;
+        isEditingBoostInput = false;
+
+        renderBoosts(true);
+        updateUI();
+
+    } catch (e) {
+        showNotification(e.message || 'Lỗi', 'error');
+    } finally {
+        setLoading(btn, false);
+    }
 };
