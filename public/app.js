@@ -1821,13 +1821,9 @@ function renderDaily() {
 }
 
 window.claimDaily = async (idx, btn) => {
-    // btn chính là nút được click
     if (!btn || btn.disabled) return;
 
-    // ⛔ khóa spam
     btn.disabled = true;
-
-    // 🔄 xoay nút – Y HỆT nâng cấp
     setLoading(btn, true);
 
     try {
@@ -1837,10 +1833,11 @@ window.claimDaily = async (idx, btn) => {
         });
 
         const data = await res.json();
+        
         if (res.ok) {
             if (data.status === 'require_ad') {
                 try {
-                    //await showDaily();
+                    await showDaily(); // Nếu có QC
                     await new Promise(r => setTimeout(r, 1200));
                     showNotification('Điểm danh thành công!', 'success');
                 } catch (qcError) {
@@ -1854,24 +1851,20 @@ window.claimDaily = async (idx, btn) => {
             throw new Error(data.error || 'Không thể điểm danh');
         }
 
-        // 🔥 sync dữ liệu (tiền + trạng thái điểm danh)
-        await Promise.all([
-            loadUserInfo({ silent: true }),
-            loadAuxData() // cập nhật isClaimedToday, dailyStreak
-        ]);
+        // 🔥 SỬA Ở ĐÂY: Chỉ cần gọi loadUserInfo là đủ
+        // Vì api/user đã trả về dailyStreak và isClaimedToday mới nhất rồi
+        await loadUserInfo({ silent: true });
 
-        // 🔁 vẽ lại UI điểm danh
+        // Vẽ lại UI điểm danh
         renderDaily();
 
     } catch (e) {
         showNotification(e.message || 'Chưa thể điểm danh', 'error');
     } finally {
-        // 🟢 dừng xoay – SAU KHI API ĐÃ REP
         setLoading(btn, false);
         btn.disabled = false;
     }
 };
-
 // =============================================================================
 // REGION 10: FEATURE - FRIENDS (BẠN BÈ)
 // =============================================================================
@@ -2472,6 +2465,7 @@ async function loadUserInfo({ silent = false } = {}) {
 // ❌ BỎ HÀM loadAuxData() VÌ KHÔNG CÒN DÙNG NỮA
 
 // Khởi tạo App (Entry Point)
+// Khởi tạo App (Entry Point)
 async function initApp() {
     try {
         const user = tg.initDataUnsafe?.user;
@@ -2483,22 +2477,19 @@ async function initApp() {
             if (nameEl) nameEl.innerText = displayName;
         }
 
-        // 🔥 CHỈ GỌI 1 API DUY NHẤT ĐỂ LẤY FULL DATA
+        // 🔥 SỬA Ở ĐÂY: Chỉ gọi 1 API duy nhất là User (Full data)
         await loadUserInfo(); 
 
-        // Render tab bạn bè ngay lập tức vì data đã có trong loadUserInfo
+        // Render tab bạn bè ngay lập tức (vì data friends đã có trong loadUserInfo)
         renderFriends();
 
     } catch (e) {
         console.error(e);
         tg.showAlert("⚠️ Lỗi kết nối máy chủ. Vui lòng thử lại!");
     } finally {
-        // ============================================================
-        // 🟢 KHI LOAD XONG THÌ MỚI TẮT MÀN HÌNH LOADING
-        // ============================================================
+        // Tắt màn hình loading
         if (window.stopLoadingSim) window.stopLoadingSim();
 
-        // Kéo thanh loading lên 100%
         const bar = document.getElementById('loading-progress');
         const pct = document.getElementById('loading-percent');
         const txt = document.getElementById('loading-text');
@@ -2507,7 +2498,6 @@ async function initApp() {
         if (pct) pct.innerText = '100%';
         if (txt) txt.innerText = 'Sẵn sàng cất cánh!';
 
-        // Ẩn màn hình loading
         const loader = document.getElementById('loading-screen');
         if (loader) {
             setTimeout(() => {
@@ -2517,7 +2507,6 @@ async function initApp() {
         }
     }
 }
-
 window.onload = () => {
     renderGameScene('IDLE');
     lucide.createIcons();
