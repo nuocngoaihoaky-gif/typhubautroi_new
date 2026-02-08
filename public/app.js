@@ -280,24 +280,28 @@ let serverTimeOffset = 0;   // 🕒 Mới: Biến lệch giờ Server
 let socialDataCache = null; // 💾 Mới: Cache
 
 // State Object chính
+// Cập nhật lại Object State (Bản Clean & Nhẹ)
 let state = {
     balance: 0,
     diamond: 0,
     totalEarned: 0,
+    
     energy: 1000,
     baseMaxEnergy: 1000,
     tapValue: 1,
     multitapLevel: 1,
     energyLimitLevel: 1,
-    nextRefillAt: 0, // timestamp ms – server authoritative
+    
     investments: {}, 
     
     // Data Social
     completedTasks: [],
     dailyStreak: 0,
-    lastDailyClaim: 0,
-    isClaimedToday: false, // ✅ Mới: Cờ check điểm danh
-    friendsList: [],
+    isClaimedToday: false, 
+    
+    // 🔥 SỬA: Bỏ friendsList, dùng số trực tiếp cho nhẹ
+    inviteCount: 0, 
+    totalInviteDiamond: 0, 
     
     // Data History
     withdrawHistory: []
@@ -1128,12 +1132,12 @@ function updateUI() {
     document.getElementById('pending-return').innerText = `+${formatNumber(pending)}`;
     document.getElementById('mine-active-count').innerText = `${activeCount} gói`;
     document.getElementById('mine-pending-return').innerText = `+${formatNumber(pending)}`;
-    document.getElementById('friend-count').innerText = state.friendsList.length;
+    
+    // 🔥 SỬA: Dùng state.inviteCount thay vì state.friendsList.length
+    const friendCountEl = document.getElementById('friend-count');
+    if(friendCountEl) friendCountEl.innerText = state.inviteCount;
 
-    if (!isEditingBoostInput) {
-        renderBoosts();
-    }
-
+    if (!isEditingBoostInput) renderBoosts();
     renderTasks();
     renderFriends();
     renderWithdrawHistory();
@@ -1685,34 +1689,23 @@ window.claimDaily = async (idx, btn) => {
 // =============================================================================
 
 function renderFriends() {
-    // ⛔ chưa có UID thì thôi
     if (!currentUserUID) return;
-
     const inviteCountEl = document.getElementById('invite-count');
     const inviteEarnEl  = document.getElementById('invite-earn');
     const inviteLinkEl  = document.getElementById('invite-link');
     const inviteQrEl    = document.getElementById('invite-qr');
 
-    if (!inviteCountEl || !inviteEarnEl || !inviteLinkEl || !inviteQrEl) {
-        return;
-    }
+    if (!inviteCountEl || !inviteEarnEl || !inviteLinkEl || !inviteQrEl) return;
 
-    // ===== DATA =====
-    const inviteCount = state.friendsList?.length || 0;
-    const inviteEarn  = state.inviteEarn || 0;
+    // 🔥 SỬA: Lấy trực tiếp từ biến số
+    inviteCountEl.innerText = state.inviteCount;
+    inviteEarnEl.innerText  = `${formatNumber(state.totalInviteDiamond)} 💎`;
+    inviteEarnEl.className  = "text-2xl font-black text-indigo-400";
 
-    const inviteLink =
-        `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
-
-    const qrUrl =
-        `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}`;
-
-    // ===== GÁN UI =====
-    inviteCountEl.innerText = inviteCount;
-    inviteEarnEl.innerText  = formatNumber(inviteEarn);
-
+    const inviteLink = `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}`;
     inviteLinkEl.value = inviteLink;
-    inviteQrEl.src     = qrUrl;
+    inviteQrEl.src = qrUrl;
 }
 
 window.copyInviteLink = () => {
@@ -2264,25 +2257,21 @@ async function loadUserInfo({ silent = false } = {}) {
 // Hàm tải dữ liệu phụ (Social, History) chạy song song với UserInfo
 async function loadAuxData() {
     try {
-        // Gọi song song 2 API để tiết kiệm thời gian
-        const socialRes = await fetch(`${API_BASE}/social`, {
-            headers: getHeaders()
-        });
-
-        // Xử lý Social Data
+        const socialRes = await fetch(`${API_BASE}/social`, { headers: getHeaders() });
         if (socialRes.ok) {
             const socialData = await socialRes.json();
+            
             state.completedTasks = socialData.completedTasks || [];
-            state.friendsList = socialData.friends || [];
+            
+            // 🔥 SỬA: Lấy thẳng số lượng (API trả về inviteCount)
+            state.inviteCount = socialData.inviteCount || 0;
+            state.totalInviteDiamond = socialData.totalInviteDiamond || 0; 
+            
             state.dailyStreak = socialData.dailyStreak ?? 0;
-            state.lastDailyClaim = socialData.lastDailyClaim ?? 0;
             state.isClaimedToday = socialData.isClaimedToday ?? false;
             state.withdrawHistory = socialData.history || [];
         }
-
-    } catch (e) {
-        console.error("Lỗi tải dữ liệu phụ:", e);
-    }
+    } catch (e) { console.error("Lỗi tải dữ liệu phụ:", e); }
 }
 
 // Khởi tạo App
