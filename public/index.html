@@ -202,41 +202,85 @@
             </div>
         </div>
 
-        <!-- TAB: FRIENDS -->
-        <div id="tab-friends" class="tab-content px-4 pb-32 overflow-y-auto relative">
-            <div class="text-center mb-6 pt-4">
-                <h2 class="text-2xl font-bold text-white mb-2">Mời bạn bè nhận thưởng!</h2>
-                <p class="text-gray-400 text-xs">Bạn và bạn bè sẽ nhận được tiền thưởng</p>
-            </div>
-            <div class="space-y-3 mb-6">
-                <div class="bg-[#2d2d3e] p-4 rounded-2xl flex items-center gap-4 border border-[#3d3d52]">
-                    <div class="w-12 h-12 bg-blue-900/30 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="users" class="w-6 h-6 text-blue-400"></i></div>
-                    <div class="text-left flex-1">
-                        <div class="font-bold text-white text-sm">Mời bạn bè</div>
-                        <div class="flex items-center gap-1 mt-1 text-xs"><span class="text-yellow-500">●</span> <span class="text-yellow-400 font-bold">+100,000</span></div>
-                    </div>
-                </div>
-                <div class="bg-[#2d2d3e] p-4 rounded-2xl flex items-center gap-4 border border-[#3d3d52]">
-                    <div class="w-12 h-12 bg-purple-900/30 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="zap" class="w-6 h-6 text-purple-400"></i></div>
-                    <div class="text-left flex-1">
-                        <div class="font-bold text-white text-sm">Bạn bè có Premium</div>
-                        <div class="flex items-center gap-1 mt-1 text-xs"><span class="text-yellow-500">●</span> <span class="text-yellow-400 font-bold">+150,000</span></div>
-                    </div>
-                </div>
-            </div>
-            <div class="mb-20">
-                <h3 class="font-bold text-white mb-3 px-1">Danh sách bạn bè (<span id="friend-count">0</span>)</h3>
-                <div id="friend-list-container" class="space-y-2"></div>
-            </div>
-            <div class="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-md px-4 flex gap-3 z-30">
-                <button onclick="copyInviteLink()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                    Mời bạn bè <i data-lucide="users" class="w-5 h-5"></i>
-                </button>
-                <button onclick="copyInviteLink()" class="w-14 bg-blue-900/80 hover:bg-blue-800 rounded-xl text-white flex items-center justify-center shadow-lg active:scale-95 transition-all border border-blue-500/30">
-                    <i data-lucide="copy" class="w-6 h-6"></i>
-                </button>
+<!-- TAB: FRIENDS (ĐỘI BAY - NEW) -->
+<div id="tab-friends" class="tab-content px-4 pb-32 overflow-y-auto relative">
+
+    <!-- HEADER -->
+    <div class="flex items-center gap-3 mt-4 mb-6">
+        <div class="w-10 h-10 rounded-full bg-blue-900/40 flex items-center justify-center border border-blue-500/30">
+            ⚡
+        </div>
+        <div>
+            <div class="text-lg font-black text-white">ĐỘI BAY</div>
+            <div class="text-xs text-gray-400">
+                Mời bạn bè – nhận 10.000💎
             </div>
         </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="grid grid-cols-2 gap-3 mb-6">
+        <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+            <div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                <i data-lucide="users" class="w-4 h-4 text-blue-400"></i>
+                Lượt mời
+            </div>
+            <div id="invite-count" class="text-2xl font-black text-white">0</div>
+        </div>
+
+        <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
+            <div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                <i data-lucide="wallet" class="w-4 h-4 text-green-400"></i>
+                Tổng thu
+            </div>
+            <div id="invite-earn" class="text-2xl font-black text-green-400">0</div>
+        </div>
+    </div>
+
+    <!-- QR -->
+    <div class="bg-[#2d2d3e]/90 rounded-2xl p-5 border border-[#3d3d52] mb-5 text-center">
+        <div class="text-sm font-bold text-white mb-3">
+            Quét mã để tham gia
+        </div>
+
+        <div class="bg-white p-3 rounded-xl inline-block">
+            <img id="invite-qr" class="w-44 h-44" />
+        </div>
+    </div>
+
+    <!-- LINK -->
+    <div class="bg-[#1c1c2e] rounded-xl p-3 border border-white/10 flex items-center gap-2 mb-4">
+        <input
+            id="invite-link"
+            readonly
+            class="flex-1 bg-transparent text-xs text-gray-300 outline-none"
+        />
+        <button
+            onclick="copyInviteLink()"
+            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500
+                   text-white text-xs font-bold active:scale-95 transition">
+            COPY
+        </button>
+    </div>
+
+    <!-- DESCRIPTION -->
+    <div class="bg-[#2d2d3e]/80 rounded-xl p-4 border border-[#3d3d52]
+                text-sm text-gray-300 space-y-2">
+        <div class="flex gap-2">
+            <span class="text-yellow-400">⭐</span>
+            <span>Gửi mã QR hoặc link giới thiệu cho bạn bè.</span>
+        </div>
+        <div class="flex gap-2">
+            <span class="text-yellow-400">⭐</span>
+            <span>Nhận <b class="text-yellow-400">25% hoa hồng</b> trọn đời.</span>
+        </div>
+        <div class="flex gap-2">
+            <span class="text-yellow-400">⭐</span>
+            <span>Hoa hồng cộng thẳng vào ví, rút được.</span>
+        </div>
+    </div>
+
+</div>
 
         <!-- TAB: WITHDRAW -->
         <div id="tab-withdraw" class="tab-content px-4 pb-32 overflow-y-auto relative">
