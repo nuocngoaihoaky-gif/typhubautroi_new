@@ -667,6 +667,13 @@ async function switchTab(tabName) {
     document.getElementById(`nav-${tabName}`).classList.add('active');
     
     const miniBal = document.getElementById('mini-balance');
+    const miniDia = document.getElementById('mini-diamond');
+
+    // ✅ 💎 LUÔN HIỆN
+    miniDia.classList.remove('hidden');
+    miniDia.classList.add('flex');
+
+    // ✅ 💰 CHỈ ẨN Ở TAB BAY
     if (tabName === 'exchange') {
         miniBal.classList.add('hidden');
         miniBal.classList.remove('flex');
@@ -704,6 +711,7 @@ async function switchTab(tabName) {
         renderWithdrawHistory();
     }
 }
+
 
 let flightInterval;
 let flightStart;
