@@ -1407,7 +1407,7 @@ window.claimInvestment = async (id, btn) => {
     }
 };
 // =============================================================================
-// REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ UPDATE THEO YÊU CẦU
+// REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ XÓA VIỀN XANH ICON
 // =============================================================================
 
 function renderTasks() {
@@ -1417,6 +1417,8 @@ function renderTasks() {
     // 1. Reset nội dung container
     container.innerHTML = '';
     
+    renderAdsgramTaskBlock('tasks-list');
+
     // ============================================================
     // A. CHUẨN BỊ HTML CHO TASK #0 (TIẾP TẾ - NHẬN KIM CƯƠNG)
     // ============================================================
@@ -1424,17 +1426,17 @@ function renderTasks() {
     const refillCooldown = (state.nextRefillAt || 0) - now;
     const isReady = refillCooldown <= 0;
     
-    // 🔥 TỶ GIÁ MỚI: 1/10 MAX NĂNG LƯỢNG (Vd: 1000 Energy -> 100 Kim Cương)
+    // Tỷ giá: 1/10 Max Năng Lượng
     const reward0 = Math.floor((state.baseMaxEnergy || 1000) / 10);
 
     let task0Html = '';
     
     if (isReady) {
-        // --- TRẠNG THÁI: SẴN SÀNG (ĐÃ BỎ VIỀN XANH & SHADOW) ---
+        // --- TRẠNG THÁI: SẴN SÀNG ---
         task0Html = `
             <div class="w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#272738] mb-3 relative overflow-hidden">
                 <div class="flex items-center gap-4 relative z-10">
-                    <div class="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center text-xl shadow-inner border border-blue-500/30">
+                    <div class="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center text-xl shadow-inner">
                         ⚡
                     </div>
                     <div class="text-left">
@@ -1456,7 +1458,7 @@ function renderTasks() {
             </div>
         `;
     } else {
-        // --- TRẠNG THÁI: ĐANG HỒI (Màu tối, Nút Timer) ---
+        // --- TRẠNG THÁI: ĐANG HỒI ---
         const mins = Math.ceil(refillCooldown / 60000);
         task0Html = `
             <div class="w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#1c1c1e] mb-3 opacity-60">
@@ -1475,20 +1477,19 @@ function renderTasks() {
             </div>
         `;
     }
+    
+    container.innerHTML += task0Html;
 
     // ============================================================
-    // B. CHUẨN BỊ HTML CHO CÁC TASK THƯỜNG
+    // B. RENDER CÁC TASK THƯỜNG
     // ============================================================
     const sortedTasks = [...TASKS].sort((a, b) => {
         const isDoneA = state.completedTasks.includes(a.id);
         const isDoneB = state.completedTasks.includes(b.id);
         if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
-        
-        // Invite xuống dưới cùng
         const isInviteA = a.type === 'invite';
         const isInviteB = b.type === 'invite';
         if (isInviteA !== isInviteB) return isInviteA ? 1 : -1;
-        
         return a.id - b.id;
     });
 
@@ -1515,16 +1516,7 @@ function renderTasks() {
         `;
     });
 
-    // ============================================================
-    // C. GỘP HTML VÀ RENDER
-    // ============================================================
-    
-    // 1. Gán HTML: Task 0 + Task thường vào container trước
-    container.innerHTML = task0Html + otherTasksHtml;
-    
-    // 2. Sau đó chèn Adsgram vào ĐẦU TIÊN (trên Task 0)
-    renderAdsgramTaskBlock('tasks-list');
-    
+    container.innerHTML += otherTasksHtml;
     lucide.createIcons();
 }
 // 🔥 HÀM MỚI: XỬ LÝ TASK #0 (XEM QC NHẬN KIM CƯƠNG)
