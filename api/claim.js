@@ -1,107 +1,130 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { verifyInitData } from './_tg';
+import { db, rtdb, verifyInitData } from './_lib';
+import { FieldValue } from 'firebase-admin/firestore';
 
-if (!getApps().length) {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
-    }
-}
-const db = getFirestore();
+// ================= CONFIG =================
+// 🔥 CÁC MỐC LEVEL CHUẨN (Khớp với jump.js và buy.js)
 const LEVEL_THRESHOLDS = [
-    0,        // Lv1
-    500000,    // Lv2
-    5000000,   // Lv3
-    50000000,  // Lv4
-    500000000  // Lv5
+    0,          // Level 1
+    500000,     // Level 2
+    5000000,    // Level 3
+    50000000,   // Level 4
+    500000000   // Level 5
 ];
 
 const INVESTMENT_CARDS = [
-    { id: 1, cost: 1000, profit: 400 }, { id: 2, cost: 5000, profit: 2500 },
-    { id: 3, cost: 10000, profit: 6000 }, { id: 4, cost: 50000, profit: 35000 },
-    { id: 5, cost: 200000, profit: 160000 }, { id: 6, cost: 1000000, profit: 900000 },
-    { id: 7, cost: 5000000, profit: 5000000 }, { id: 8, cost: 20000000, profit: 25000000 }
+    { id: 1, cost: 1000, profit: 400 }, 
+    { id: 2, cost: 5000, profit: 2500 },
+    { id: 3, cost: 10000, profit: 6000 }, 
+    { id: 4, cost: 50000, profit: 35000 },
+    { id: 5, cost: 200000, profit: 160000 }, 
+    { id: 6, cost: 1000000, profit: 900000 },
+    { id: 7, cost: 5000000, profit: 5000000 }, 
+    { id: 8, cost: 20000000, profit: 25000000 }
 ];
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+    // 1. Verify User
     const initData = req.headers['x-init-data'];
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgUser = verifyInitData(initData, botToken);
+    
     if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const uid = String(tgUser.id);
     const { id } = req.body;
+    
+    // Validate Card
     const card = INVESTMENT_CARDS.find(c => c.id === id);
     if (!card) return res.status(400).json({ error: 'Gói không hợp lệ' });
 
     const userRef = db.collection('users').doc(uid);
+    const walletRef = rtdb.ref(`user_wallets/${uid}`);
 
     try {
-        const result = await db.runTransaction(async (t) => {
-            const snap = await t.get(userRef);
-            if (!snap.exists) throw new Error('User not found');
+        // =========================================================
+        // BƯỚC 1: CHECK ĐIỀU KIỆN (FIRESTORE)
+        // =========================================================
+        const userSnap = await userRef.get();
+        if (!userSnap.exists) return res.status(400).json({ error: 'User not found' });
 
-            const data = snap.data();
-            const investments = data.investments || {};
-            const finishTime = investments[id];
+        const userData = userSnap.data();
+        const investments = userData.investments || {};
+        const finishTime = investments[id];
 
-            if (!finishTime) throw new Error('Bạn chưa đầu tư gói này');
+        // A. Check tồn tại
+        if (!finishTime) {
+            return res.status(400).json({ error: 'Bạn chưa đầu tư gói này' });
+        }
 
-            const now = Date.now();
-            if (now < finishTime) {
-                const remainMinutes = Math.ceil((finishTime - now) / 60000);
-                throw new Error(`Chưa đến giờ (còn ${remainMinutes} phút)`);
+        // B. Check thời gian
+        const now = Date.now();
+        if (now < finishTime) {
+            const remainMinutes = Math.ceil((finishTime - now) / 60000);
+            return res.status(400).json({ error: `Chưa đến giờ thu hoạch (còn ${remainMinutes} phút)` });
+        }
+
+        // =========================================================
+        // BƯỚC 2: CỘNG TIỀN (REALTIME DB)
+        // =========================================================
+        const totalReturn = card.cost + card.profit;
+        let newBalance = 0;
+
+        await walletRef.transaction((data) => {
+            if (data) {
+                data.balance = (data.balance || 0) + totalReturn;
+                newBalance = data.balance;
             }
-
-            const totalReturn = card.cost + card.profit;
-            const newBalance = (data.balance || 0) + totalReturn;
-            
-            // Xóa gói khỏi danh sách
-            const newInvestments = { ...investments };
-            delete newInvestments[id];
-
-            // ===== EXP & LEVEL =====
-            let currentExp = data.exp || 0;
-            let currentLevel = data.level || 1;
-
-            // Cộng EXP từ lợi nhuận
-            let newExp = currentExp + card.profit;
-            let newLevel = currentLevel;
-
-            // Check lên level (có thể lên nhiều cấp nếu ăn lớn)
-            while (
-                LEVEL_THRESHOLDS[newLevel] !== undefined &&
-                newExp >= LEVEL_THRESHOLDS[newLevel]
-            ) {
-                newExp -= LEVEL_THRESHOLDS[newLevel];
-                newLevel++;
-            }
-
-            t.update(userRef, {
-                balance: newBalance,
-                total_earned: FieldValue.increment(card.profit),
-
-                // ✅ EXP + LEVEL mới
-                exp: newExp,
-                level: newLevel,
-
-                [`investments.${id}`]: FieldValue.delete()
-            });
-
-            return { newBalance, newInvestments, earned: card.profit };
+            return data;
         });
 
-        // 🔥 TRẢ VỀ KẾT QUẢ ĐẦY ĐỦ
+        // =========================================================
+        // BƯỚC 3: CẬP NHẬT LEVEL & XÓA GÓI (FIRESTORE)
+        // =========================================================
+        // Tính toán Level mới dựa trên Total Earned (Logic đồng bộ với jump.js)
+        let currentExp = userData.exp || 0;
+        let currentTotal = (userData.total_earned || 0) + card.profit;
+        let newLevel = userData.level || 1;
+
+        // Cộng dồn EXP
+        let newExp = currentExp + card.profit;
+
+        // Check Level (Duyệt ngược mảng threshold)
+        for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+            if (currentTotal >= LEVEL_THRESHOLDS[i]) {
+                const calculatedLevel = i + 1;
+                if (calculatedLevel > newLevel) {
+                    newLevel = calculatedLevel;
+                }
+                break;
+            }
+        }
+
+        // Update Firestore
+        await userRef.update({
+            // Xóa gói
+            [`investments.${id}`]: FieldValue.delete(),
+            
+            // Cập nhật chỉ số
+            total_earned: currentTotal,
+            exp: newExp,
+            level: newLevel
+        });
+
+        // Trả về kết quả
+        const newInvestments = { ...investments };
+        delete newInvestments[id];
+
         return res.status(200).json({ 
             ok: true, 
-            balance: result.newBalance,
-            investments: result.newInvestments,
-            earned: result.earned
+            balance: newBalance,
+            investments: newInvestments,
+            earned: card.profit
         });
 
     } catch (e) {
-        return res.status(400).json({ error: e.message });
+        console.error('Claim API Error:', e);
+        return res.status(500).json({ error: 'Lỗi thu hoạch' });
     }
 }
