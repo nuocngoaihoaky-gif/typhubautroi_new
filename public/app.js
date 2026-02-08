@@ -2456,9 +2456,9 @@ async function loadUserInfo({ silent = false } = {}) {
 // ❌ BỎ HÀM loadAuxData() VÌ KHÔNG CÒN DÙNG NỮA
 
 // Khởi tạo App (Entry Point)
-// Khởi tạo App (Entry Point)
 async function initApp() {
     try {
+        // 1. Lấy thông tin từ Telegram
         const user = tg.initDataUnsafe?.user;
         if (user) {
             currentUserUID = user.id;
@@ -2468,36 +2468,61 @@ async function initApp() {
             if (nameEl) nameEl.innerText = displayName;
         }
 
-        // 🔥 SỬA Ở ĐÂY: Chỉ gọi 1 API duy nhất là User (Full data)
+        // 2. Gọi API User (Nếu lỗi nó sẽ nhảy ngay xuống catch)
         await loadUserInfo(); 
 
-        // Render tab bạn bè ngay lập tức (vì data friends đã có trong loadUserInfo)
+        // 3. Render các phần phụ sau khi có data
         renderFriends();
 
-    } catch (e) {
-        console.error(e);
-        tg.showAlert("⚠️ Lỗi kết nối máy chủ. Vui lòng thử lại!");
-    } finally {
-        // Tắt màn hình loading
+        // ============================================================
+        // 🟢 THÀNH CÔNG: CHỈ CHẠY VÀO ĐÂY NẾU KHÔNG CÓ LỖI
+        // ============================================================
+        
+        // Dừng giả lập %
         if (window.stopLoadingSim) window.stopLoadingSim();
 
+        // Kéo thanh loading lên 100% cho đẹp
         const bar = document.getElementById('loading-progress');
         const pct = document.getElementById('loading-percent');
         const txt = document.getElementById('loading-text');
 
         if (bar) bar.style.width = '100%';
         if (pct) pct.innerText = '100%';
-        if (txt) txt.innerText = 'Sẵn sàng cất cánh!';
+        if (txt) txt.innerText = 'Sẵn sàng!';
 
+        // Đợi xíu cho user nhìn thấy 100% rồi ẩn màn hình Loading đi
         const loader = document.getElementById('loading-screen');
         if (loader) {
             setTimeout(() => {
                 loader.style.opacity = '0';
                 setTimeout(() => loader.remove(), 500);
-            }, 300);
+            }, 500);
         }
+
+    } catch (e) {
+        // ============================================================
+        // 🔴 THẤT BẠI: GIỮ NGUYÊN MÀN HÌNH LOADING
+        // ============================================================
+        console.error("Init Error:", e);
+        
+        // Hiện thông báo lỗi lên màn hình loading để user biết
+        const txt = document.getElementById('loading-text');
+        const bar = document.getElementById('loading-progress');
+        
+        if (txt) {
+            txt.innerText = 'Lỗi kết nối. Vui lòng tải lại!';
+            txt.style.color = '#ef4444'; // Màu đỏ
+        }
+        if (bar) {
+            bar.style.backgroundColor = '#ef4444'; // Thanh loading đỏ
+        }
+
+        tg.showAlert("⚠️ Không thể tải dữ liệu. Vui lòng kiểm tra mạng và mở lại game.");
+        
+        // ⛔ KHÔNG ẨN LOADER -> Che đi giao diện lỗi bên dưới
     }
 }
+
 window.onload = () => {
     renderGameScene('IDLE');
     lucide.createIcons();
