@@ -139,25 +139,37 @@
         </div>
     </div>
 
-
     <div class="absolute top-0 left-0 w-full h-full z-0 overflow-hidden pointer-events-none">
         <div class="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-900/10 blur-[120px] rounded-full"></div>
     </div>
 
     <div class="z-10 flex flex-col h-full w-full max-w-lg mx-auto bg-black/20 border-x border-white/5 h-screen relative">
+        
         <div class="pt-4 px-4 pb-2 z-20 relative flex-shrink-0">
-            <div class="flex items-center mb-4">
-                <div class="flex items-center gap-2 bg-[#2d2d3e]/80 py-1 px-3 rounded-full border border-white/10">
-                    <span class="text-xl">✈️</span>
-                    <span class="text-sm font-bold">Tỷ Phú Bầu Trời</span>
+            <div class="flex items-center mb-4 justify-between">
+                
+                <div class="flex items-center gap-3 bg-[#2d2d3e]/60 py-1.5 px-2 pr-4 rounded-full border border-white/5 backdrop-blur-md shadow-lg">
+                    <div class="relative">
+                        <img id="header-avatar" 
+                             src="https://ui-avatars.com/api/?name=Phi+Cong&background=3b82f6&color=fff&size=128" 
+                             class="w-10 h-10 rounded-full border-2 border-white/10 object-cover shadow-inner">
+                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#2d2d3e] rounded-full animate-pulse"></div>
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="header-username" class="text-sm font-bold text-white leading-none mb-0.5 max-w-[120px] truncate">Đang tải...</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[9px] text-gray-400 font-mono bg-black/30 px-1.5 rounded" id="header-userid">ID: ---</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="ml-auto flex items-center gap-2">
-                    <div id="mini-diamond" class="items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10 flex">
-                        <span class="text-lg">💎</span>
+
+                <div class="flex items-center gap-2">
+                    <div id="mini-diamond" class="items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 flex shadow-sm">
+                        <span class="text-lg drop-shadow-md">💎</span>
                         <span id="mini-diamond-text" class="text-sm font-bold text-blue-400">0</span>
                     </div>
-                    <div id="mini-balance" class="hidden items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
-                        <span class="text-lg">💰</span>
+                    <div id="mini-balance" class="hidden items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
+                        <span class="text-lg drop-shadow-md">💰</span>
                         <span id="mini-balance-text" class="text-sm font-bold text-yellow-400">0</span>
                     </div>
                 </div>
@@ -387,6 +399,30 @@
 
             // Khi App.js load xong (nó sẽ gọi hàm ẩn loading), interval này sẽ bị clear
             window.stopLoadingSim = () => clearInterval(intv);
+
+            // 🔥 LOGIC HIỂN THỊ AVATAR TELEGRAM
+            const tg = window.Telegram.WebApp;
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                const avatarEl = document.getElementById('header-avatar');
+                const nameEl = document.getElementById('header-username');
+                const idEl = document.getElementById('header-userid');
+
+                // Tên hiển thị
+                let fullName = user.first_name || '';
+                if (user.last_name) fullName += ' ' + user.last_name;
+                nameEl.innerText = fullName || `Phi công ${user.id}`;
+
+                // ID hiển thị
+                idEl.innerText = `ID: ${user.id}`;
+
+                // Avatar (Nếu có photo_url thì dùng, ko thì dùng UI Avatars)
+                if (user.photo_url) {
+                    avatarEl.src = user.photo_url;
+                } else {
+                    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=3b82f6&color=fff&size=128`;
+                }
+            }
         });
     </script>
 </body>
