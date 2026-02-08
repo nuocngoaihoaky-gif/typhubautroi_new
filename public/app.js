@@ -1683,10 +1683,20 @@ window.claimDaily = async (idx, btn) => {
 
 
 function renderFriends() {
-    const container = document.getElementById('friend-list-container');
-    if (!container) return;
+    // ⛔ chưa có UID thì thôi
+    if (!currentUserUID) return;
 
-    const inviteCount = state.friendsList.length;
+    const inviteCountEl = document.getElementById('invite-count');
+    const inviteEarnEl  = document.getElementById('invite-earn');
+    const inviteLinkEl  = document.getElementById('invite-link');
+    const inviteQrEl    = document.getElementById('invite-qr');
+
+    if (!inviteCountEl || !inviteEarnEl || !inviteLinkEl || !inviteQrEl) {
+        return;
+    }
+
+    // ===== DATA =====
+    const inviteCount = state.friendsList?.length || 0;
     const inviteEarn  = state.inviteEarn || 0;
 
     const inviteLink =
@@ -1695,57 +1705,13 @@ function renderFriends() {
     const qrUrl =
         `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}`;
 
-    container.innerHTML = `
-        <!-- STATS -->
-        <div class="grid grid-cols-2 gap-3 mb-6">
-            <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
-                <div class="text-xs text-gray-400 mb-1">Lượt mời</div>
-                <div class="text-2xl font-black text-white">${inviteCount}</div>
-            </div>
+    // ===== GÁN UI =====
+    inviteCountEl.innerText = inviteCount;
+    inviteEarnEl.innerText  = formatNumber(inviteEarn);
 
-            <div class="bg-[#2d2d3e]/90 rounded-xl p-4 border border-[#3d3d52]">
-                <div class="text-xs text-gray-400 mb-1">Tổng thu</div>
-                <div class="text-2xl font-black text-green-400">
-                    ${formatNumber(inviteEarn)}
-                </div>
-            </div>
-        </div>
-
-        <!-- QR -->
-        <div class="bg-[#2d2d3e]/90 rounded-2xl p-5 border border-[#3d3d52] mb-5 text-center">
-            <div class="text-sm font-bold text-white mb-3">
-                Quét mã để tham gia
-            </div>
-            <div class="bg-white p-3 rounded-xl inline-block">
-                <img src="${qrUrl}" class="w-44 h-44" />
-            </div>
-        </div>
-
-        <!-- LINK -->
-        <div class="bg-[#1c1c2e] rounded-xl p-3 border border-white/10 flex items-center gap-2 mb-4">
-            <input
-                readonly
-                value="${inviteLink}"
-                class="flex-1 bg-transparent text-xs text-gray-300 outline-none"
-            />
-            <button
-                onclick="copyInviteLink()"
-                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500
-                       text-white text-xs font-bold active:scale-95 transition">
-                COPY
-            </button>
-        </div>
-
-        <!-- NOTE -->
-        <div class="bg-[#2d2d3e]/80 rounded-xl p-4 border border-[#3d3d52]
-                    text-sm text-gray-300 space-y-2">
-            <div>• Chia sẻ link hoặc mã QR cho bạn bè.</div>
-            <div>• Thành viên tham gia sẽ được ghi nhận vào đội.</div>
-            <div>• Thưởng được cộng trực tiếp vào tài khoản.</div>
-        </div>
-    `;
+    inviteLinkEl.value = inviteLink;
+    inviteQrEl.src     = qrUrl;
 }
-
 
 window.copyInviteLink = () => {
     const link = `https://t.me/TyPhuBauTroi_bot/MiniApp?startapp=${currentUserUID}`;
@@ -2338,12 +2304,14 @@ async function initApp() {
             if (nameEl) nameEl.innerText = displayName;
         }
 
-        // 🔥 GỌI ALL API NGAY TỪ ĐẦU (User + Social + History)
-        // Promise.all giúp chạy song song, tổng thời gian = thời gian của API chậm nhất
+        // 🔥 GỌI ALL API NGAY TỪ ĐẦU
         await Promise.all([
-            loadUserInfo(), // Tải tiền, level (Quan trọng nhất)
-            loadAuxData()   // Tải nhiệm vụ, bạn bè, lịch sử (Để lát nữa bấm tab là có luôn)
+            loadUserInfo(),
+            loadAuxData()
         ]);
+
+        // ✅ ✅ ✅ DÒNG CẦN THÊM — CHỈ 1 DÒNG NÀY
+        renderFriends();
 
     } catch (e) {
         console.error(e);
