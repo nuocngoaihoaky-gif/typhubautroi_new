@@ -1,10 +1,10 @@
 // =========================================
 // 💰 CẤU HÌNH 2 LOẠI QUẢNG CÁO
 // =========================================
-const ID_ENERGY_AD = "22291";      // Loại Reward (Bắt buộc xem hết)
-const ID_FLY_AD    = "int-22308";  // Loại Interstitial (Có thể tắt)
-const ID_TASK_AD   = "task-22327";
-const ID_DAILY_AD    = "22440";
+const ID_ENERGY_AD = "2291";      // Loại Reward (Bắt buộc xem hết)
+const ID_FLY_AD    = "int-2308";  // Loại Interstitial (Có thể tắt)
+const ID_TASK_AD   = "task-2327";
+const ID_DAILY_AD    = "2240";
 
 let EnergyAdController; // Điều khiển QC Năng lượng
 let FlyAdController;    // Điều khiển QC Bay
@@ -761,7 +761,7 @@ async function startFlight() {
     lucide.createIcons();
     try {
         // Code sẽ dừng ở đây chờ user xem xong video
-        await showFlyAd(); 
+        //await showFlyAd(); 
     } catch (e) {
         // Nếu user tắt ngang -> Báo lỗi và KHÔNG cho bay
         showNotification(e.message, 'error');
@@ -1631,7 +1631,7 @@ window.claimDaily = async (idx, btn) => {
         if (res.ok) {
             if (data.status === 'require_ad') {
                 try {
-                    await showDaily();
+                    //await showDaily();
                     await new Promise(r => setTimeout(r, 1200));
                     showNotification('Điểm danh thành công!', 'success');
                 } catch (qcError) {
@@ -1955,7 +1955,7 @@ window.applyBoost = async (type, btn) => {
         // ============================================================
         if (type === 'energy') {
             try {
-                await showEnergyAd();
+                //await showEnergyAd();
                 await new Promise(r => setTimeout(r, 1200));
                 showNotification('Hồi năng lượng thành công!', 'success');
             } catch (qcError) {
