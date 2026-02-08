@@ -36,7 +36,9 @@ export default async function handler(req, res) {
     const userRef = db.collection('users').doc(uid);
     const bankRegRef = db.collection('bank_registry').doc(bankDocId);
     const walletRef = rtdb.ref(`user_wallets/${uid}`);
-    const socialRef = db.collection('user_social').doc(uid);
+    
+    // ❌ KHÔNG CẦN DÒNG NÀY NỮA VÌ ĐÃ GỘP VÀO USER
+    // const socialRef = db.collection('user_social').doc(uid);
 
     // Biến cờ đánh dấu đây có phải lần đầu liên kết bank không
     let isNewBankBind = false;
@@ -53,8 +55,6 @@ export default async function handler(req, res) {
 
         if (savedBank) {
             // A. NGƯỜI CŨ: Đã có bank -> Bắt buộc dùng bank cũ (Chống cheat đổi bank liên tục)
-            // Hoặc nếu bác cho phép đổi thì phải check trùng lại. 
-            // Ở đây theo logic của bác: "Có info rồi thì thôi" -> Dùng luôn thông tin cũ để rút
             if (savedBank.account_number !== account_number || savedBank.bank_code !== bank_code) {
                  return res.status(400).json({ error: 'Thông tin ngân hàng không khớp với dữ liệu đã lưu!' });
             }
@@ -97,8 +97,9 @@ export default async function handler(req, res) {
         
         const batch = db.batch(); // Dùng Batch để ghi 1 lần cho an toàn
 
-        // 1. Lưu lịch sử rút tiền
-        batch.update(socialRef, {
+        // 1. Lưu lịch sử rút tiền (Vào thẳng doc User)
+        // 🔥 SỬA: Dùng userRef thay vì socialRef
+        batch.update(userRef, {
             withdrawHistory: FieldValue.arrayUnion({
                 id: transCode,
                 amount: realAmountVND,
@@ -149,7 +150,6 @@ export default async function handler(req, res) {
 }
 
 // ================= HELPER FUNCTIONS =================
-// (Giữ nguyên như cũ)
 async function sendTelegramFirst(token, photoUrl, uid, amountVND) {
     try {
         const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
