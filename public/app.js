@@ -730,6 +730,7 @@ let currentRunMoney = 0;
 let flightResolved = false; 
 let ignoreCheckResult = false; 
 let visualEnergy = 0;
+let isEditingBoostInput = false;
 
 function calcAngle() {
     const container = document.getElementById('game-container');
@@ -1850,151 +1851,125 @@ document.getElementById('withdraw-amount').addEventListener('input', (e) => {
     document.getElementById('withdraw-rate').innerText = `Quy đổi: ${formatNumber(val * 0.001)} VNĐ`;
 });
 
-function renderBoosts() {
+function renderBoosts(force = false) {
+    if (isEditingBoostInput && !force) return;
+
     const container = document.getElementById('boost-list');
     if (!container) return;
     
     const multitapCost = 5000 * Math.pow(2, state.multitapLevel - 1);
     const energyCost = 5000 * Math.pow(2, state.energyLimitLevel - 1);
-    
-    // --- 🕒 LOGIC HỒI CHIÊU ---
-    const now = getNow();
-    const nextRefillAt = state.nextRefillAt || 0;
-    const remainingTime = nextRefillAt - now;
-    const isReady = remainingTime <= 0;
-    
-    // Style
-    const upgradeBtnStyle =
-        "px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all min-w-[70px]";
-    const disabledBtnStyle =
-        "px-3 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60 min-w-[70px]";
 
-    const createItem = (icon, color, name, desc, actionHtml) => `
-        <div class="bg-[#1e1e2e] border border-white/5 p-4 rounded-xl shadow-md mb-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-full bg-${color}-500/20 text-${color}-400 flex items-center justify-center border border-${color}-500/30">
-                        ${icon}
-                    </div>
-                    <div>
-                        <div class="font-bold text-sm text-white">${name}</div>
-                        <div class="text-[10px] text-gray-400 mt-0.5">${desc}</div>
-                    </div>
+    const upgradeBtnStyle =
+        "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-[3px] transition-all min-w-[90px]";
+    const disabledBtnStyle =
+        "px-4 py-2 bg-gray-600 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed opacity-60 min-w-[90px]";
+
+    const createItem = (icon, color, name, desc, bodyHtml) => `
+        <div class="bg-[#1e1e2e] border border-white/5 p-4 rounded-xl shadow-md mb-4">
+            <div class="flex items-center gap-4 mb-3">
+                <div class="w-10 h-10 rounded-full bg-${color}-500/20 text-${color}-400 flex items-center justify-center border border-${color}-500/30">
+                    ${icon}
                 </div>
-                ${actionHtml}
+                <div>
+                    <div class="font-bold text-sm text-white">${name}</div>
+                    <div class="text-[11px] text-gray-400">${desc}</div>
+                </div>
             </div>
+            ${bodyHtml}
         </div>
     `;
 
     let html = '';
 
-    // =========================================================
-    // 1️⃣ NẠP ĐẦY BÌNH (COOLDOWN)
-    // =========================================================
-    let refillBtn, refillDesc;
-    if (isReady) {
-        refillDesc = "Sẵn sàng sử dụng";
-        refillBtn = `
-            <button onclick="applyBoost('energy', this)"
-                class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-lg shadow-[0_3px_0_#a16207] active:translate-y-[3px] transition-all">
-                Nạp đầy
-            </button>`;
-    } else {
-        const mins = Math.floor(remainingTime / 60000);
-        const secs = Math.floor((remainingTime % 60000) / 1000);
-        const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-        refillDesc = `Chờ hồi chiêu: ${timeStr}`;
-        refillBtn = `<button disabled class="${disabledBtnStyle}">${timeStr}</button>`;
-    }
-
-    html += createItem(
-        '<i data-lucide="zap" class="w-5 h-5"></i>',
-        'yellow',
-        'Nạp đầy bình',
-        refillDesc,
-        refillBtn
-    );
-
-    // =========================================================
-    // 1️⃣.5 💎 ĐỔI KIM CƯƠNG → NĂNG LƯỢNG (NHẬP SỐ)
-    // =========================================================
-    const ENERGY_PER_DIAMOND = 50;
-    const maxBuyableEnergy = Math.max(0, state.baseMaxEnergy - state.energy);
-
-    const diamondExchangeHtml = `
-        <div class="flex items-center gap-2">
-            <input
-                id="diamond-energy-input"
-                type="number"
-                min="1"
-                max="${maxBuyableEnergy}"
-                placeholder="+⚡"
-                class="w-20 px-2 py-1 text-xs rounded-md bg-[#2c2c3e] text-white border border-white/10 outline-none"
-                oninput="updateDiamondEnergyPreview()"
-            />
-            <button
-                id="diamond-energy-btn"
-                onclick="applyBoost('diamond_energy', this)"
-                class="${upgradeBtnStyle}"
-                disabled>
-                💎 0
-            </button>
-        </div>
-    `;
-
-    html += createItem(
-        '<i data-lucide="gem" class="w-5 h-5"></i>',
-        'cyan',
-        'Đổi kim cương',
-        `1 💎 = ${ENERGY_PER_DIAMOND} ⚡`,
-        diamondExchangeHtml
-    );
-
-    // =========================================================
-    // 2️⃣ TURBO
-    // =========================================================
-    const canBuyTurbo = state.balance >= multitapCost;
-    const turboBtn = `
-        <button onclick="applyBoost('multitap', this)"
-            ${!canBuyTurbo ? 'disabled' : ''}
-            class="${canBuyTurbo ? upgradeBtnStyle : disabledBtnStyle}">
-            ${formatNumber(multitapCost)} 💰
-        </button>`;
-
+    // =================================================
+    // TURBO
+    // =================================================
     html += createItem(
         '<i data-lucide="chevrons-up" class="w-5 h-5"></i>',
         'blue',
         `Turbo Lv.${state.multitapLevel}`,
         `+${state.tapValue} chuyển đổi`,
-        turboBtn
+        `<button onclick="applyBoost('multitap', this)"
+            ${state.balance < multitapCost ? 'disabled' : ''}
+            class="${state.balance >= multitapCost ? upgradeBtnStyle : disabledBtnStyle}">
+            ${formatNumber(multitapCost)} 💰
+        </button>`
     );
 
-    // =========================================================
-    // 3️⃣ BÌNH XĂNG
-    // =========================================================
-    const canBuyTank = state.balance >= energyCost;
-    const tankBtn = `
-        <button onclick="applyBoost('limit', this)"
-            ${!canBuyTank ? 'disabled' : ''}
-            class="${canBuyTank ? upgradeBtnStyle : disabledBtnStyle}">
-            ${formatNumber(energyCost)} 💰
-        </button>`;
-
+    // =================================================
+    // BÌNH XĂNG
+    // =================================================
     html += createItem(
         '<i data-lucide="battery-charging" class="w-5 h-5"></i>',
         'purple',
         `Bình xăng Lv.${state.energyLimitLevel}`,
         `Max ${formatNumber(state.baseMaxEnergy)} năng lượng`,
-        tankBtn
+        `<button onclick="applyBoost('limit', this)"
+            ${state.balance < energyCost ? 'disabled' : ''}
+            class="${state.balance >= energyCost ? upgradeBtnStyle : disabledBtnStyle}">
+            ${formatNumber(energyCost)} 💰
+        </button>`
+    );
+
+    // =================================================
+    // 💎 MUA NĂNG LƯỢNG (INPUT – RỘNG – Ở CUỐI)
+    // =================================================
+    const maxEnergyBuy = state.baseMaxEnergy - state.energy;
+
+    html += createItem(
+        '<i data-lucide="zap" class="w-5 h-5"></i>',
+        'yellow',
+        'Mua năng lượng',
+        '1 💎 = 50 ⚡',
+        `
+        <div class="flex flex-col gap-3">
+            <input
+                id="buy-energy-input"
+                type="number"
+                min="1"
+                max="${maxEnergyBuy}"
+                placeholder="Nhập số năng lượng muốn mua"
+                class="w-full px-4 py-3 rounded-xl bg-[#2c2c3e] text-white border border-white/10 outline-none text-sm"
+                onfocus="isEditingBoostInput = true"
+                onblur="isEditingBoostInput = false"
+                oninput="updateBuyEnergyPreview()"
+            />
+
+            <button
+                id="buy-energy-btn"
+                onclick="applyBoost('buy_energy', this)"
+                class="${upgradeBtnStyle}"
+                disabled>
+                💎 0
+            </button>
+        </div>
+        `
+    );
+
+    // =================================================
+    // 🪙 ĐỔI VÀNG → KIM CƯƠNG (1:1)
+    // =================================================
+    html += createItem(
+        '<i data-lucide="gem" class="w-5 h-5"></i>',
+        'cyan',
+        'Đổi vàng → kim cương',
+        'Tỷ lệ 1 💰 = 1 💎',
+        `<button onclick="applyBoost('gold_to_diamond', this)"
+            ${state.balance < 1 ? 'disabled' : ''}
+            class="${state.balance >= 1 ? upgradeBtnStyle : disabledBtnStyle}">
+            Đổi ngay
+        </button>`
     );
 
     container.innerHTML = html;
     lucide.createIcons();
 }
 
-window.updateDiamondEnergyPreview = () => {
-    const input = document.getElementById('diamond-energy-input');
-    const btn = document.getElementById('diamond-energy-btn');
+
+window.updateBuyEnergyPreview = () => {
+    const input = document.getElementById('buy-energy-input');
+    const btn = document.getElementById('buy-energy-btn');
     if (!input || !btn) return;
 
     const ENERGY_PER_DIAMOND = 50;
@@ -2016,9 +1991,10 @@ window.updateDiamondEnergyPreview = () => {
         return;
     }
 
-    btn.innerText = `${diamonds} 💎`;
+    btn.innerText = `Mua (${diamonds} 💎)`;
     btn.disabled = false;
 };
+
 
 
 window.applyBoost = async (type, btn) => {
