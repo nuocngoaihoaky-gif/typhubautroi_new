@@ -3,10 +3,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import jwt from 'jsonwebtoken';
 
 // ================= CONFIG =================
-const REGEN_RATE = 3;         // 3 energy/giây
-const TICK_MS = 80;           // 80ms/tick
+const REGEN_RATE = 3;         
+const TICK_MS = 80;           
 const JWT_SECRET = process.env.JWT_SECRET;
-const REF_BONUS_DIAMOND = 10000; // Thưởng 10k Kim Cương
+const REF_BONUS_DIAMOND = 10000; 
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -31,14 +31,13 @@ export default async function handler(req, res) {
         await walletRef.transaction((data) => {
             if (!data) return data; 
 
-            // A. Check Ref Flag (Cờ trong RTDB)
-            // Nếu chưa có cờ ref_claimed hoặc nó là false -> Đánh dấu true luôn để chặn các request sau
+            // A. Check Ref Flag (Dùng cờ Realtime để chặn, ko cần check Firestore)
             if (data.ref_claimed !== true) {
                 shouldProcessRef = true; 
-                data.ref_claimed = true; 
+                data.ref_claimed = true; // Bật cờ ngay lập tức để chặn spam
             }
 
-            // B. Tính toán hồi năng lượng
+            // B. Tính toán hồi năng lượng (An toàn cho VIP)
             const lastUpdate = data.last_energy_update || now;
             const elapsedSeconds = Math.floor((now - lastUpdate) / 1000);
             const maxEnergy = data.baseMaxEnergy || 1000;
@@ -50,7 +49,7 @@ export default async function handler(req, res) {
 
             if (energyStart <= 10) return; // Không đủ năng lượng
 
-            // C. Random kết quả bay
+            // C. Random kết quả
             const rand = Math.random() * 100;
             let randomFlyMs;
             if (rand < 5) randomFlyMs = (1 + Math.random() * 3) * 1000;
@@ -73,61 +72,38 @@ export default async function handler(req, res) {
             const crashTime = now + flightMs;
             const energyLost = Math.floor((flightMs / TICK_MS) * tapValue);
             
-            // D. Trừ năng lượng
+            // D. Trừ năng lượng (Không kẹp trần)
             data.energy = energyStart - energyLost;
             data.last_energy_update = crashTime;
 
-            resultPayload = {
-                crashTime,
-                energyLost,
-                mode,
-                energyStart, 
-                balance: data.balance
-            };
-
+            resultPayload = { crashTime, energyLost, mode, energyStart, balance: data.balance };
             return data; 
         });
 
-        // Nếu transaction fail (không đủ năng lượng)
         if (!resultPayload.crashTime) {
             return res.status(400).json({ error: 'Không đủ năng lượng' });
         }
 
         // ============================================================
-        // 🎁 BƯỚC 2: XỬ LÝ REF (NẾU CỜ BẬT -> CHẠY VÀ AWAIT)
+        // 🎁 BƯỚC 2: XỬ LÝ TRẢ THƯỞNG (NẾU CỜ REALTIME BẬT)
         // ============================================================
         if (shouldProcessRef) {
-            // Lấy thông tin người giới thiệu từ Firestore
-            const userRef = db.collection('users').doc(uid);
-            const userSnap = await userRef.get();
-            
-            if (userSnap.exists) {
-                const userData = userSnap.data();
-                const referrerId = userData.ref_by; 
+            // Lấy ID người mời từ Firestore (Chỉ read 1 lần để lấy ID)
+            const userSnap = await db.collection('users').doc(uid).get();
+            const referrerId = userSnap.data()?.ref_by;
 
-                // Chỉ trả thưởng nếu có người mời và người mời không phải là Admin
-                if (referrerId && referrerId !== '8065435277') {
-                     // 🔥 QUAN TRỌNG: AWAIT ĐỂ ĐẢM BẢO SERVERLESS KHÔNG KILL PROCESS
-                     try {
-                        await processReferralReward(referrerId, botToken, tgUser.first_name);
-                     } catch (err) {
-                        console.error("Ref Error:", err);
-                        // Lỗi trả thưởng thì kệ, vẫn cho user bay tiếp để không chặn trải nghiệm
-                     }
-                }
+            // Nếu có người mời và ID hợp lệ (không phải Admin, không rỗng)
+            if (referrerId && referrerId !== '8065435277') {
+                // 🔥 Gọi hàm trả thưởng ngay, KHÔNG CẦN CẮT CHUỖI, KHÔNG CẦN CHECK PREFIX
+                processReferralReward(referrerId, botToken, tgUser.first_name).catch(console.error);
             }
         }
 
         // ============================================================
-        // 🔐 BƯỚC 3: TẠO TOKEN & TRẢ KẾT QUẢ
+        // 🔐 BƯỚC 3: TẠO TOKEN
         // ============================================================
         const payload = jwt.sign(
-            {
-                uid,
-                crashTime: resultPayload.crashTime,
-                energyLost: resultPayload.energyLost,
-                mode: resultPayload.mode
-            },
+            { uid, crashTime: resultPayload.crashTime, energyLost: resultPayload.energyLost, mode: resultPayload.mode },
             JWT_SECRET,
             { expiresIn: '2m' }
         );
@@ -146,44 +122,56 @@ export default async function handler(req, res) {
 }
 
 // ============================================================
-// 🎁 HÀM TRẢ THƯỞNG REF
+// 🎁 HÀM TRẢ THƯỞNG REF (GỌN NHẸ)
 // ============================================================
 async function processReferralReward(referrerId, botToken, newUserName) {
-    if (!referrerId) return;
+    const refWalletPath = `user_wallets/${referrerId}`;
+    
+    // 1. Cộng tiền Realtime
+    await rtdb.ref(refWalletPath).transaction((data) => {
+        if (data) data.diamond = (data.diamond || 0) + REF_BONUS_DIAMOND;
+        return data;
+    });
+
+    // 2. Cộng chỉ số Firestore
+    await db.collection('users').doc(referrerId).update({
+        invite_count: FieldValue.increment(1),
+        total_invite_diamond: FieldValue.increment(REF_BONUS_DIAMOND) 
+    });
+
+    // 3. Báo tin vui (Theo mẫu bạn yêu cầu)
+    const text = `🎉 *BẠN ĐÃ TUYỂN ĐƯỢC PHI CÔNG MỚI!*
+
+👤 *Thành viên:* ${newUserName || 'Một phi công mới'}
+✈️ Họ đã hoàn thành chuyến bay đầu tiên.
+
+💰 Đã nhận: 10,000💎
+
+👉 Nhấn nút bên dưới để vào Mini App để kiểm tra số dư ngay 🚀`;
 
     try {
-        const refWalletPath = `user_wallets/${referrerId}`;
-        
-        // A. Cộng Kim Cương RTDB (AWAIT)
-        await rtdb.ref(refWalletPath).transaction((data) => {
-            if (data) {
-                data.diamond = (data.diamond || 0) + REF_BONUS_DIAMOND;
-            }
-            return data;
-        });
-
-        // B. Cập nhật Firestore (AWAIT)
-        await db.collection('user_social').doc(referrerId).update({
-            invite_count: FieldValue.increment(1),
-            total_invite_diamond: FieldValue.increment(REF_BONUS_DIAMOND) 
-        });
-
-        // C. Báo tin vui (AWAIT LUÔN CHO CHẮC CÚ TRÊN SERVERLESS)
-        const msg = `🎉 <b>CHÚC MỪNG!</b>\n\nBạn bè <b>${newUserName}</b> đã bắt đầu chuyến bay đầu tiên!\n\n🎁 Bạn nhận được: <b>+${REF_BONUS_DIAMOND.toLocaleString()} 💎 Kim Cương</b>`;
-        
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: referrerId,
-                text: msg,
-                parse_mode: 'HTML'
+                text: text,
+                parse_mode: 'Markdown', // Sử dụng Markdown cho tin nhắn này
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '🚀 Mở Mini App', url: 'https://t.me/TyPhuBauTroi_bot/MiniApp' }
+                    ]]
+                }
             })
         });
 
-    } catch (err) {
-        console.error('Lỗi trả thưởng Ref:', err);
-        // Throw để bên ngoài biết (nhưng ở trên mình đã try/catch rồi nên an toàn)
-        throw err;
+        // Log lỗi nếu Telegram từ chối gửi (ví dụ user chặn bot)
+        if (!res.ok) {
+            const data = await res.json();
+            console.error("Telegram Error:", data.description);
+        }
+    } catch (e) {
+        console.error('Send Notify Error:', e);
+        // Không throw lỗi ở đây để tránh làm chết luồng chính của api/start
     }
 }
