@@ -31,7 +31,6 @@ export default async function handler(req, res) {
     try {
         const now = Date.now();
         
-        // 🔥 Chạy song song
         const [userSnap, walletSnap] = await Promise.all([
             userRef.get(),
             walletRef.once('value')
@@ -56,7 +55,7 @@ export default async function handler(req, res) {
                 await walletRef.set(walletData);
             }
 
-            // Tính năng lượng hồi (Visual only)
+            // Tính năng lượng
             const lastUpdate = walletData.last_energy_update || now;
             const maxEnergy = walletData.baseMaxEnergy || 1000;
             let currentEnergy = walletData.energy || 0;
@@ -65,24 +64,24 @@ export default async function handler(req, res) {
                 currentEnergy = Math.min(currentEnergy + elapsed * REGEN_RATE, maxEnergy);
             }
 
-            // =========================================================
-            // 🔥 LOGIC TÍNH STREAK (Server tự reset nếu đứt)
-            // =========================================================
+            // --- LOGIC STREAK & CHECK-IN ---
             const todayStr = getVNDateString(now);
             const yesterdayStr = getVNDateString(now - 86400000);
             
             const lastDate = firestoreData.last_daily_date || "";
             let currentStreak = firestoreData.daily_streak || 0;
 
-            // Logic 1: Đứt chuỗi (Last date ko phải hôm qua và ko phải hôm nay) -> Reset 0
+            // Đứt chuỗi -> Reset
             if (lastDate !== todayStr && lastDate !== yesterdayStr) {
                 currentStreak = 0;
             }
-
-            // Logic 2: Hết vòng (Đã xong 10 ngày và last date là hôm qua) -> Reset 0
+            // Hết vòng -> Reset
             if (currentStreak >= DAILY_REWARDS_LENGTH && lastDate === yesterdayStr) {
                 currentStreak = 0;
             }
+
+            // 🔥 TÍNH TOÁN TRẠNG THÁI (QUAN TRỌNG ĐỂ NÚT MỜ ĐI)
+            const isClaimedToday = (lastDate === todayStr);
 
             return res.status(200).json({
                 id: uid,
@@ -110,31 +109,25 @@ export default async function handler(req, res) {
                 completedTasks: firestoreData.completed_tasks || [],
                 withdrawHistory: firestoreData.withdrawHistory || [],
                 
-                // Daily Checkin (Đã tính toán lại Streak)
+                // Daily Checkin
                 dailyStreak: currentStreak,
-                lastDailyDate: lastDate, // Trả về để client tự check isClaimedToday nếu cần
+                isClaimedToday: isClaimedToday, // <--- PHẢI CÓ CÁI NÀY NÚT MỚI TẮT
 
                 server_time: now
             });
         }
 
         // =========================================================
-        // TRƯỜNG HỢP 2: USER MỚI (TẠO ACC)
+        // TRƯỜNG HỢP 2: USER MỚI
         // =========================================================
         const params = new URLSearchParams(initData);
         let refUid = params.get('start_param');
+        if (!refUid || refUid === uid || isNaN(Number(refUid))) { refUid = DEFAULT_REF_UID; }
         
-        if (!refUid || refUid === uid || isNaN(Number(refUid))) {
-            refUid = DEFAULT_REF_UID;
-        }
         let finalRefBy = DEFAULT_REF_UID;
         if (refUid !== DEFAULT_REF_UID) {
             const refUser = await db.collection('users').doc(refUid).get();
-            if (refUser.exists) {
-                finalRefBy = REF_PREFIX + refUid; 
-            } else {
-                finalRefBy = DEFAULT_REF_UID;
-            }
+            finalRefBy = refUser.exists ? (REF_PREFIX + refUid) : DEFAULT_REF_UID;
         }
 
         const batch = db.batch();
@@ -144,19 +137,10 @@ export default async function handler(req, res) {
             telegram_id: Number(uid),
             username: tgUser.username || tgUser.first_name || `Phi công ${uid.slice(-4)}`,
             ref_by: finalRefBy,
-            
-            // Stats
             level: 1, exp: 0, multitapLevel: 1, tapValue: 1, energyLimitLevel: 1,
             investments: {}, bank_info: null,
-
-            // Social & Daily
-            invite_count: 0,
-            total_invite_diamond: 0,
-            completed_tasks: [],
-            withdrawHistory: [],
-            daily_streak: 0,
-            last_daily_date: null, 
-
+            invite_count: 0, total_invite_diamond: 0, completed_tasks: [], withdrawHistory: [],
+            daily_streak: 0, last_daily_date: null, 
             created_at: FieldValue.serverTimestamp()
         };
         batch.set(userRef, newFirestoreData);
@@ -171,14 +155,10 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
             ...newFirestoreData,
+            inviteCount: 0, totalInviteDiamond: 0, completedTasks: [], withdrawHistory: [],
+            dailyStreak: 0, 
             
-            // Map keys
-            inviteCount: 0,
-            totalInviteDiamond: 0,
-            completedTasks: [],
-            withdrawHistory: [],
-            dailyStreak: 0,
-            lastDailyDate: null,
+            isClaimedToday: false, // User mới chắc chắn chưa nhận
 
             ...newWalletData,
             server_time: now
