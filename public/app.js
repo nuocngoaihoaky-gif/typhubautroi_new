@@ -304,7 +304,8 @@ let state = {
     totalInviteDiamond: 0, 
     
     // Data History
-    withdrawHistory: []
+    withdrawHistory: [],
+    bank_info: null
 };
 
 // Game Loop & UI Variables
@@ -1713,6 +1714,38 @@ window.copyInviteLink = () => {
 // =============================================================================
 // REGION 11: FEATURE - WITHDRAW (RÚT TIỀN)
 // =============================================================================
+function applyBankInfoToWithdrawForm() {
+    const bankEl   = document.getElementById('bank-name');
+    const numEl    = document.getElementById('account-number');
+    const nameEl   = document.getElementById('account-holder');
+
+    if (!bankEl || !numEl || !nameEl) return;
+
+    // ✅ ĐÃ CÓ BANK_INFO → KHÓA CỨNG
+    if (state.bank_info) {
+        bankEl.value = state.bank_info.bank_code || '';
+        numEl.value  = state.bank_info.account_number || '';
+        nameEl.value = state.bank_info.account_name || '';
+
+        bankEl.disabled = true;
+        numEl.disabled  = true;
+        nameEl.disabled = true;
+
+        bankEl.classList.add('opacity-60');
+        numEl.classList.add('opacity-60');
+        nameEl.classList.add('opacity-60');
+    }
+    // 🆕 CHƯA CÓ → MỞ NHẬP
+    else {
+        bankEl.disabled = false;
+        numEl.disabled  = false;
+        nameEl.disabled = false;
+
+        bankEl.classList.remove('opacity-60');
+        numEl.classList.remove('opacity-60');
+        nameEl.classList.remove('opacity-60');
+    }
+}
 
 function renderWithdrawHistory() {
     const container = document.getElementById('withdraw-history');
@@ -2161,6 +2194,7 @@ async function switchTab(tabName) {
 
     if (tabName === 'withdraw') {
         renderWithdrawHistory();
+        applyBankInfoToWithdrawForm();
     }
 }
 
@@ -2197,6 +2231,8 @@ async function loadUserInfo({ silent = false } = {}) {
 
         // Data Đầu tư
         state.investments = data.investments ?? {};
+        state.bank_info = data.bank_info ?? null;
+
 
         // Data Hồi năng lượng (Nếu API trả về - tùy logic server)
         // Nếu server bạn chưa trả về 2 dòng này ở api/user thì có thể bỏ qua
@@ -2233,7 +2269,7 @@ async function loadUserInfo({ silent = false } = {}) {
         }
 
         updateUI();
-        
+        applyBankInfoToWithdrawForm();
         if (!loopInterval) startLoops();
 
     } catch (e) {
