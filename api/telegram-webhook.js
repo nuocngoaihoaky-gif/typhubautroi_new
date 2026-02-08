@@ -4,7 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = '8065435277'; // ID Admin
 
-// Cấu hình phần thưởng điểm danh (Đã đổi sang KIM CƯƠNG - Tỷ lệ 1/10)
+// Cấu hình phần thưởng điểm danh (KIM CƯƠNG)
 const DAILY_REWARDS = [
     500, 500, 500, 500, 
     1000, // Ngày 5
@@ -30,8 +30,8 @@ export default async function handler(req, res) {
         const { uid, type } = req.query || {};
         
         if (req.method === 'GET' && uid && type) {
+            // 🔥 SỬA: Chỉ dùng collection 'users'
             const userRef = db.collection('users').doc(String(uid));
-            const socialRef = db.collection('user_social').doc(String(uid));
             const walletRef = rtdb.ref(`user_wallets/${uid}`);
             const now = Date.now();
 
@@ -40,20 +40,18 @@ export default async function handler(req, res) {
                 // Cộng Vàng vào RTDB (25k Vàng)
                 await walletRef.transaction((data) => {
                     if (data) {
-                        data.balance = (data.balance || 0) + 25000;
+                        data.diamond = (data.diamond || 0) + 2500;
                     }
                     return data;
                 });
-                // Update thống kê vào Firestore (nếu cần)
-                userRef.update({ total_earned: FieldValue.increment(25000) }).catch(() => {});
             } 
             
-            // B. ENERGY REWARD (Xem QC hồi năng lượng -> ĐỔI THÀNH CỘNG KIM CƯƠNG)
+            // B. ENERGY REWARD (Xem QC hồi năng lượng -> CỘNG KIM CƯƠNG)
             else if (type === 'energy') {
                 await walletRef.transaction((data) => {
                     if (data) {
                         const maxEnergy = data.baseMaxEnergy || 1000;
-                        // Thay vì hồi năng lượng, cộng Kim Cương = Max Energy
+                        // Cộng Kim Cương = Max Energy
                         data.diamond = (data.diamond || 0) + maxEnergy;
                     }
                     return data;
@@ -65,17 +63,18 @@ export default async function handler(req, res) {
                 let reward = 0;
                 
                 await db.runTransaction(async (t) => {
-                    const socialSnap = await t.get(socialRef);
-                    const socialData = socialSnap.exists ? socialSnap.data() : {};
+                    const userSnap = await t.get(userRef);
+                    const userData = userSnap.exists ? userSnap.data() : {};
                     const todayStr = getVNDateString(now);
 
-                    if (socialData.last_daily_date === todayStr) return; // Đã điểm danh
+                    // Lấy thông tin từ user doc (đã gộp)
+                    if (userData.last_daily_date === todayStr) return; // Đã điểm danh
 
                     // Tính Streak
-                    let currentStreak = socialData.daily_streak || 0;
+                    let currentStreak = userData.daily_streak || 0;
                     const yesterdayStr = getVNDateString(now - 86400000);
                     
-                    if (socialData.last_daily_date === yesterdayStr) currentStreak++;
+                    if (userData.last_daily_date === yesterdayStr) currentStreak++;
                     else currentStreak = 1;
                     
                     if (currentStreak > DAILY_REWARDS.length) currentStreak = 1;
@@ -83,12 +82,13 @@ export default async function handler(req, res) {
                     // Lấy quà (Kim cương)
                     reward = DAILY_REWARDS[currentStreak - 1] || 500;
 
-                    // Update Firestore (Lưu ngày + streak)
+                    // Update Firestore
                     const updateData = { daily_streak: currentStreak, last_daily_date: todayStr };
-                    if (!socialSnap.exists) {
-                        t.set(socialRef, { ...updateData, invite_count: 0, completed_tasks: [] }, { merge: true });
+                    if (!userSnap.exists) {
+                        // Trường hợp user chưa init (hiếm), tạo mới
+                        t.set(userRef, { ...updateData, invite_count: 0, completed_tasks: [] }, { merge: true });
                     } else {
-                        t.update(socialRef, updateData);
+                        t.update(userRef, updateData);
                     }
                 });
 
@@ -112,7 +112,6 @@ export default async function handler(req, res) {
             const content = (body.content || body.description || "").toString();
 
             // A. WEBHOOK NGÂN HÀNG (Ưu tiên)
-            // Kiểm tra nội dung CK có chữ "TyPhuBauTroi" (không phân biệt hoa thường)
             if (content && content.toUpperCase().includes('TYPHUBAUTROI')) {
                 return await handleBankWebhook(content, res);
             }
@@ -141,25 +140,26 @@ async function handleBankWebhook(content, res) {
         console.log("🔔 Bank Webhook:", content);
 
         // 1. Parse ID Đơn + UID
-        // Regex: Tìm chuỗi số + TyPhuBauTroi + chuỗi số
         const match = content.match(/(\d+)\s*TyPhuBauTroi\s*(\d+)/i);
         if (!match) {
             return res.status(200).json({ status: 'ignored_no_match' });
         }
 
-        const transCode = match[1]; // Mã giao dịch (ID tin nhắn Admin)
+        const transCode = match[1]; // Mã giao dịch
         const uid = match[2];       // UID user
 
-        // 2. Tìm User trong Firestore
-        const socialRef = db.collection('user_social').doc(String(uid));
-        const snap = await socialRef.get();
+        // 2. Tìm User trong Firestore (Collection users)
+        // 🔥 SỬA: Đổi sang collection 'users'
+        const userRef = db.collection('users').doc(String(uid));
+        const snap = await userRef.get();
 
         if (!snap.exists) {
             return res.status(200).json({ status: 'user_not_found' });
         }
 
-        const socialData = snap.data();
-        const history = socialData.withdrawHistory || [];
+        const userData = snap.data();
+        // Lấy lịch sử rút tiền từ trong user doc
+        const history = userData.withdrawHistory || [];
 
         // 3. Tìm đơn hàng trùng khớp
         const idx = history.findIndex(
@@ -172,7 +172,7 @@ async function handleBankWebhook(content, res) {
 
         const transaction = history[idx];
 
-        // 4. Check trạng thái (Tránh duyệt lại đơn đã xong)
+        // 4. Check trạng thái
         if (transaction.status === 'done') {
             return res.status(200).json({ status: 'already_done' });
         }
@@ -184,7 +184,8 @@ async function handleBankWebhook(content, res) {
             updated_at: Date.now()
         };
 
-        await socialRef.update({
+        // Update lại vào User Doc
+        await userRef.update({
             withdrawHistory: history
         });
 
