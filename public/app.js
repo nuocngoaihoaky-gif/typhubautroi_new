@@ -1328,131 +1328,248 @@ window.claimInvestment = async (id, btn) => {
 };
 
 // =============================================================================
-// REGION 8: FEATURE - TASKS (NHIỆM VỤ)
+// REGION 8: FEATURE - TASKS (NHIỆM VỤ) - 🔥 ĐÃ CẬP NHẬT TASK #0
 // =============================================================================
 
 function renderTasks() {
     const container = document.getElementById('tasks-list');
     if (!container) return;
     
+    // 1. Reset nội dung container
     container.innerHTML = '';
     
-    // 1. Luôn render Adsgram Task (Vip) ở trên cùng
-    renderAdsgramTaskBlock('tasks-list');
+    // ============================================================
+    // A. CHUẨN BỊ HTML CHO TASK #0 (TIẾP TẾ)
+    // ============================================================
+    const now = getNow();
+    const refillCooldown = (state.nextRefillAt || 0) - now;
+    const isReady = refillCooldown <= 0;
+    
+    // Phần thưởng = Max Năng Lượng hiện tại
+    const reward0 = state.baseMaxEnergy || 1000;
 
-    // 2. Sắp xếp danh sách Task trước khi vẽ
+    let task0Html = '';
+    
+    if (isReady) {
+        // --- TRẠNG THÁI: SẴN SÀNG (Màu sáng, Nút bấm được) ---
+        task0Html = `
+            <div class="w-full flex items-center justify-between p-4 rounded-xl border border-blue-500/50 bg-[#272738] mb-3 shadow-[0_0_15px_rgba(59,130,246,0.15)] relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-xl -mr-5 -mt-5"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center text-xl shadow-inner border border-blue-500/30">
+                        ⚡
+                    </div>
+                    <div class="text-left">
+                        <div class="font-bold text-sm text-white flex items-center gap-2">
+                            Nhiệm vụ Tiếp Tế
+                            <span class="text-[9px] bg-red-500 text-white px-1.5 rounded animate-pulse">HOT</span>
+                        </div>
+                        <div class="flex items-center gap-1 mt-0.5">
+                            <span class="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold">
+                                +${formatNumber(reward0)}💎
+                            </span>
+                            <span class="text-[9px] text-gray-500 ml-1">(Reset 15p)</span>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="claimEnergyTask(this)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-lg active:scale-95 transition-all flex items-center gap-1 relative z-10">
+                    Làm <i data-lucide="play-circle" class="w-3 h-3"></i>
+                </button>
+            </div>
+        `;
+    } else {
+        // --- TRẠNG THÁI: ĐANG HỒI (Màu tối, Nút Timer) ---
+        // Sau khi làm xong nó sẽ hiện cái này 👇
+        const mins = Math.ceil(refillCooldown / 60000);
+        task0Html = `
+            <div class="w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#1c1c1e] mb-3 opacity-60">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-xl grayscale">
+                        ⚡
+                    </div>
+                    <div class="text-left">
+                        <div class="font-bold text-sm text-gray-400">Nhiệm vụ Tiếp Tế</div>
+                        <div class="text-[10px] text-gray-500">Đang chuẩn bị hàng...</div>
+                    </div>
+                </div>
+                <div class="px-3 py-1.5 bg-gray-700 text-gray-400 text-xs font-bold rounded-lg border border-gray-600 flex items-center gap-1 cursor-not-allowed">
+                    <i data-lucide="timer" class="w-3 h-3"></i> ${mins}p
+                </div>
+            </div>
+        `;
+    }
+
+    // ============================================================
+    // B. CHUẨN BỊ HTML CHO CÁC TASK THƯỜNG
+    // ============================================================
     const sortedTasks = [...TASKS].sort((a, b) => {
         const isDoneA = state.completedTasks.includes(a.id);
         const isDoneB = state.completedTasks.includes(b.id);
-
-        // ƯU TIÊN 1: Đã làm xong vứt xuống đáy xã hội
-        if (isDoneA !== isDoneB) {
-            return isDoneA ? 1 : -1; // Ai xong (true) thì return 1 (xuống dưới)
-        }
-
-        // ƯU TIÊN 2: Nếu cùng chưa làm (hoặc cùng đã làm) -> Check loại nhiệm vụ
-        // Invite (Mời bạn) cho xuống dưới
-        // Tele/Partner (Đối tác) cho lên trên
-        const isInviteA = a.type === 'invite'; // Hoặc check a.id >= 5
+        if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
+        
+        // Invite xuống dưới cùng
+        const isInviteA = a.type === 'invite';
         const isInviteB = b.type === 'invite';
-
-        if (isInviteA !== isInviteB) {
-            return isInviteA ? 1 : -1; // Invite (true) thì xuống dưới
-        }
-
-        // ƯU TIÊN 3: Giữ nguyên thứ tự ID (1,2,3...)
+        if (isInviteA !== isInviteB) return isInviteA ? 1 : -1;
+        
         return a.id - b.id;
     });
 
-    // 3. Vẽ vòng lặp như cũ
+    let otherTasksHtml = '';
     sortedTasks.forEach(task => {
         const isCompleted = state.completedTasks.includes(Number(task.id));
-        
-        const bgClass = isCompleted 
-            ? 'bg-emerald-900/20 border-emerald-800 opacity-60 cursor-default order-last' 
-            : 'bg-[#272738] border-[#3d3d52] hover:bg-[#323246] active:scale-[0.98] cursor-pointer';
-
-        const iconHtml = isCompleted
-            ? '<i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500"></i>'
-            : '<i data-lucide="chevron-right" class="w-5 h-5 text-gray-500"></i>';
-
+        const bgClass = isCompleted ? 'bg-emerald-900/20 border-emerald-800 opacity-60 cursor-default order-last' : 'bg-[#272738] border-[#3d3d52] hover:bg-[#323246] active:scale-[0.98] cursor-pointer';
+        const iconHtml = isCompleted ? '<i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500"></i>' : '<i data-lucide="chevron-right" class="w-5 h-5 text-gray-500"></i>';
         const onClickAction = isCompleted ? '' : `onclick="onClickTask(${task.id})"`;
 
-        const html = `
+        otherTasksHtml += `
             <div ${onClickAction} class="w-full flex items-center justify-between p-4 rounded-xl border transition-all mb-3 ${bgClass}">
                 <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-xl shadow-inner">
-                        ${task.icon}
-                    </div>
+                    <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-xl shadow-inner">${task.icon}</div>
                     <div class="text-left">
                         <div class="font-bold text-sm text-white">${task.name}</div>
                         <div class="flex items-center gap-1 mt-0.5">
-                            <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold">
-                                +${formatNumber(task.reward)}💎
-                            </span>
+                            <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold">+${formatNumber(task.reward)}💎</span>
                         </div>
                     </div>
                 </div>
                 ${iconHtml}
             </div>
         `;
-        container.innerHTML += html;
     });
+
+    // ============================================================
+    // C. GỘP HTML VÀ RENDER
+    // ============================================================
+    
+    // 1. Gán HTML Task 0 + Task thường vào container trước
+    container.innerHTML = task0Html + otherTasksHtml;
+    
+    // 2. Sau đó mới gọi hàm render Adsgram
+    // Hàm này dùng insertBefore(firstChild), nên nó sẽ chèn Adsgram LÊN TRÊN ĐẦU Task #0
+    renderAdsgramTaskBlock('tasks-list');
     
     lucide.createIcons();
 }
+// 🔥 HÀM MỚI: XỬ LÝ TASK #0 (XEM QC NHẬN KIM CƯƠNG)
+window.claimEnergyTask = async (btn) => {
+    if (!btn || btn.disabled) return;
+    
+    // 1. Xem QC trước
+    try {
+        setLoading(btn, true);
+        await showEnergyAd(); 
+    } catch (e) {
+        showNotification(e.message, 'error');
+        setLoading(btn, false);
+        return;
+    }
 
+    // 2. Xem xong -> Gọi Server nhận thưởng
+    try {
+        // Gọi API 'apply' với type 'energy'
+        // Server sẽ: Check thời gian -> Cộng kim cương (bằng maxEnergy) -> Reset cooldown 15p
+        const res = await fetch(`${API_BASE}/apply`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ type: 'energy' }) // Backend đã sửa để 'energy' nhận Kim Cương
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Lỗi nhận thưởng');
+
+        showNotification(`Nhận thành công +${formatNumber(state.baseMaxEnergy)}💎`, 'success');
+        
+        // 3. Sync lại data (lấy tiền và thời gian chờ mới)
+        await loadUserInfo({ silent: true });
+        
+        // Vẽ lại danh sách nhiệm vụ để nút chuyển sang trạng thái "Chờ"
+        renderTasks();
+
+    } catch (e) {
+        showNotification(e.message, 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+};
 function renderAdsgramTaskBlock(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Xóa block cũ nếu có (để tránh trùng lặp)
+    // Xóa block cũ (cả adsgram-task lẫn div chờ) nếu có để tránh trùng
     const oldBlock = container.querySelector('adsgram-task');
+    const oldWaitBlock = document.getElementById('adsgram-wait-block');
     if (oldBlock) oldBlock.remove();
+    if (oldWaitBlock) oldWaitBlock.remove();
 
-    // 1. KIỂM TRA THỜI GIAN
+    // 1. TÍNH THỜI GIAN
     const lastClick = parseInt(localStorage.getItem('last_task_click_ts') || '0');
     const now = Date.now();
     const remaining = TASK_COOLDOWN - (now - lastClick);
 
-    // 2. NẾU ĐANG HỒI CHIÊU -> ẨN LUÔN (RETURN NGAY LẬP TỨC)
+    // 2. LOGIC HIỂN THỊ
     if (remaining > 0) {
-        return; // Không vẽ gì cả -> Nhiệm vụ biến mất
-    }
-
-    // 3. NẾU ĐÃ HỒI -> VẼ ADSGRAM NHƯ BÌNH THƯỜNG
-    const taskEl = document.createElement('adsgram-task');
-    taskEl.setAttribute('data-block-id', ID_TASK_AD);
-    
-    taskEl.innerHTML = `
-        <div slot="icon" class="w-10 h-10 rounded-full bg-indigo-900/50 flex items-center justify-center text-xl shadow-inner border border-indigo-500/30 mr-4">
-            🚀
-        </div>
-
-        <div slot="title" class="font-bold text-sm text-white">Nhiệm vụ Đối Tác Vip</div>
-        <div slot="description" class="text-[10px] text-gray-400">Tham gia kênh để nhận thưởng lớn</div>
+        // === TRẠNG THÁI: ĐANG HỒI CHIÊU (Hiện thẻ xám + Đồng hồ) ===
+        const mins = Math.ceil(remaining / 60000);
         
-        <div slot="reward" class="flex items-center gap-1 mt-1">
-             <span class="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold translate-x-3.5">
-                +2,500💎
-            </span>
-        </div>
+        const waitEl = document.createElement('div');
+        waitEl.id = 'adsgram-wait-block';
+        waitEl.className = "w-full flex items-center justify-between p-4 rounded-xl border border-[#3d3d52] bg-[#1c1c1e] mb-3 opacity-60";
+        
+        waitEl.innerHTML = `
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-indigo-900/30 flex items-center justify-center text-xl shadow-inner border border-indigo-500/10 grayscale">
+                    🚀
+                </div>
+                <div class="text-left">
+                    <div class="font-bold text-sm text-gray-400">Nhiệm vụ Đối Tác Vip</div>
+                    <div class="text-[10px] text-gray-500">Đang tìm nhà tài trợ...</div>
+                </div>
+            </div>
+            <div class="px-3 py-1.5 bg-gray-700 text-gray-400 text-xs font-bold rounded-lg border border-gray-600 flex items-center gap-1 cursor-not-allowed">
+                <i data-lucide="timer" class="w-3 h-3"></i> ${mins}p
+            </div>
+        `;
+        
+        // Chèn vào đầu danh sách
+        container.insertBefore(waitEl, container.firstChild);
+        
+    } else {
+        // === TRẠNG THÁI: SẴN SÀNG (Hiện thẻ Adsgram chuẩn) ===
+        const taskEl = document.createElement('adsgram-task');
+        taskEl.setAttribute('data-block-id', ID_TASK_AD);
+        
+        taskEl.innerHTML = `
+            <div slot="icon" class="w-10 h-10 rounded-full bg-indigo-900/50 flex items-center justify-center text-xl shadow-inner border border-indigo-500/30 mr-4">
+                🚀
+            </div>
 
-        <div slot="button" class="ml-auto -mr-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
-            Làm <i data-lucide="chevron-right" class="w-3 h-3"></i>
-        </div>
+            <div slot="title" class="font-bold text-sm text-white">Nhiệm vụ Đối Tác Vip</div>
+            <div slot="description" class="text-[10px] text-gray-400">Tham gia kênh để nhận thưởng lớn</div>
+            
+            <div slot="reward" class="flex items-center gap-1 mt-1">
+                 <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold translate-x-3.5">
+                    +25,000
+                </span>
+            </div>
 
-        <div slot="claim" class="ml-auto -mr-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg animate-pulse cursor-pointer flex items-center gap-1">
-            Nhận  <i data-lucide="gift" class="w-3 h-3"></i>
-        </div>
+            <div slot="button" class="ml-auto -mr-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
+                Làm <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            </div>
 
-        <div slot="done" class="ml-auto -mr-2 px-3 py-1.5 bg-gray-700 text-gray-400 text-xs font-bold rounded-lg cursor-default">
-            Checking...
-        </div>
-    `;
+            <div slot="claim" class="ml-auto -mr-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg animate-pulse cursor-pointer flex items-center gap-1">
+                Nhận  <i data-lucide="gift" class="w-3 h-3"></i>
+            </div>
 
-    // Chèn vào đầu danh sách
-    container.insertBefore(taskEl, container.firstChild);
+            <div slot="done" class="ml-auto -mr-2 px-3 py-1.5 bg-gray-700 text-gray-400 text-xs font-bold rounded-lg cursor-default">
+                Checking...
+            </div>
+        `;
+
+        // Chèn vào đầu danh sách
+        container.insertBefore(taskEl, container.firstChild);
+    }
+    
     lucide.createIcons();
 }
 
