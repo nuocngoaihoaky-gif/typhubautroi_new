@@ -2033,46 +2033,34 @@ window.toggleBoostPanel = (key) => {
 window.confirmBuyEnergy = (btn) => {
     const input = document.getElementById('buy-energy-input');
     if (!input) return;
-
     const want = parseInt(input.value, 10);
-    if (!want || !want <= 0) return;
-
-    // Gắn data cho server dùng
+    if (!want || want <= 0) return;
+    
+    // Gửi số lượng
     btn.dataset.amount = want;
 
-    // 🔒 Đóng panel ngay để tránh double render
-    openedBoostPanel = null;
-    isEditingBoostInput = false;
+    // ❌ XÓA 2 DÒNG NÀY (Để không bị đóng panel lập tức)
+    // openedBoostPanel = null; 
+    // isEditingBoostInput = false;
 
+    // Gọi API (Hàm này sẽ xoay nút -> Gọi API -> Thành công mới đóng panel)
     applyBoost('buy_energy', btn);
 };
 
-// 2. Logic Preview Mua Năng Lượng (Phiên bản chính thức)
-window.updateBuyEnergyPreview = () => {
-    const input = document.getElementById('buy-energy-input');
-    const btn = document.getElementById('buy-energy-confirm');
-    if (!input || !btn) return;
-
-    const ENERGY_PER_DIAMOND = 50;
+window.confirmGoldToDiamond = (btn) => {
+    const input = document.getElementById('gold-to-diamond-input');
+    if (!input) return;
     const want = parseInt(input.value, 10);
+    if (!want || want <= 0) return;
+    
+    // Gửi số lượng
+    btn.dataset.amount = want;
 
-    if (!want || want <= 0) {
-        btn.innerText = '0💎';
-        btn.disabled = true;
-        return;
-    }
+    // ❌ XÓA 2 DÒNG NÀY LUÔN
+    // openedBoostPanel = null;
+    // isEditingBoostInput = false;
 
-    // ✅ KHÔNG GIỚI HẠN MAX NỮA
-    const diamondsNeed = Math.ceil(want / ENERGY_PER_DIAMOND);
-
-    if (diamondsNeed > state.diamond) {
-        btn.innerText = 'Thiếu 💎';
-        btn.disabled = true;
-        return;
-    }
-
-    btn.innerText = `Mua (${diamondsNeed}💎)`;
-    btn.disabled = false;
+    applyBoost('gold_to_diamond', btn);
 };
 
 // 3. Logic Preview Đổi Vàng (Phiên bản chính thức)
