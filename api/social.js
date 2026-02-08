@@ -1,16 +1,4 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { verifyInitData } from './_tg';
-
-// 1. INIT FIREBASE (Thêm databaseURL cho đồng bộ với các file khác)
-if (!getApps().length && process.env.FIREBASE_SERVICE_ACCOUNT) {
-    initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
-        databaseURL: "https://typhubaytroi-default-rtdb.asia-southeast1.firebasedatabase.app"
-    });
-}
-
-const db = getFirestore();
+import { db, verifyInitData } from './_lib';
 
 // Helper: Lấy ngày giờ Việt Nam (YYYY-MM-DD)
 function getVNDateString(timestamp) {
@@ -22,9 +10,9 @@ function getVNDateString(timestamp) {
 export default async function handler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-    // 2. VERIFY
+    // 1. VERIFY (Dùng hàm từ _lib.js)
     const initData = req.headers['x-init-data'];
-    const botToken = process.env.TELEGRAM_BOT_TOKEN; // Sửa lại dòng này cho đúng biến môi trường
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgUser = verifyInitData(initData, botToken);
     
     if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -32,12 +20,12 @@ export default async function handler(req, res) {
     const uid = String(tgUser.id);
 
     try {
-        // 3. LẤY DỮ LIỆU TỪ FIRESTORE (1 Read)
+        // 2. LẤY DỮ LIỆU TỪ FIRESTORE (1 Read)
         const socialRef = db.collection('user_social').doc(uid);
         const socialSnap = await socialRef.get();
         const socialData = socialSnap.exists ? socialSnap.data() : {};
 
-        // 4. XỬ LÝ ĐIỂM DANH (DAILY)
+        // 3. XỬ LÝ ĐIỂM DANH (DAILY)
         const now = Date.now();
         const todayStr = getVNDateString(now);
         const yesterdayStr = getVNDateString(now - 24 * 3600 * 1000);
@@ -51,22 +39,24 @@ export default async function handler(req, res) {
             currentStreak = 0;
         }
 
-        // 5. TRẢ VỀ DỮ LIỆU (Đã bỏ danh sách bạn bè dài ngoằng)
+        // 4. TRẢ VỀ DỮ LIỆU
         return res.status(200).json({
             // Nhiệm vụ
             completedTasks: socialData.completed_tasks || [],
             
-            // Bạn bè (Chỉ lấy số lượng)
-            // Nếu bạn muốn hiển thị list trống thì để [], frontend sẽ hiện "Chưa mời ai" hoặc chỉ hiện số
-            friends: [], 
+            // Bạn bè
+            friends: [], // Vẫn để rỗng để tiết kiệm data
             inviteCount: socialData.invite_count || 0,
+            
+            // 🔥 THÊM CÁI NÀY: Tổng Kim Cương kiếm được từ mời
+            totalInviteDiamond: socialData.total_invite_diamond || 0, 
             
             // Điểm danh
             dailyStreak: currentStreak,
             isClaimedToday: isClaimedToday,
-            lastDailyClaim: socialData.last_daily_date || '', // Thêm cái này cho Client dễ check
+            lastDailyClaim: socialData.last_daily_date || '',
 
-            // Lịch sử rút tiền (QUAN TRỌNG)
+            // Lịch sử rút tiền
             history: socialData.withdrawHistory || []
         });
 
