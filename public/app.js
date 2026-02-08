@@ -47,6 +47,14 @@ const INVESTMENT_CARDS = [
 // 📋 CẤU HÌNH NHIỆM VỤ
 const TASKS = [
     { 
+        id: 0, 
+        name: 'Xem 1  quảng cáo ngắn', 
+        reward: 0, // Sẽ tự tính bằng Max Energy
+        icon: '🎬', 
+        type: 'ad_energy', // Loại đặc biệt
+        link: '#' 
+    },
+    { 
         id: 1, 
         name: 'Tham gia Kênh Thông báo', 
         reward: 25000, 
@@ -1223,7 +1231,7 @@ function renderInvestments() {
                             <span class="text-base font-bold text-white group-hover:text-amber-400 transition-colors">${card.name}</span>
                             <div class="flex items-center gap-1.5 mt-1">
                                 <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-md border border-emerald-500/30">
-                                    LÃI ${Math.round((card.profit/card.cost)*100)}%
+                                    LÃI ${Math.round((card./card.cost)*100)}%
                                 </span>
                                 <span class="text-xs text-slate-400">sau 1h</span>
                             </div>
@@ -1233,7 +1241,7 @@ function renderInvestments() {
                 
                 <div class="flex justify-between items-center bg-slate-900/50 px-3 py-2 rounded-lg mb-4 border border-white/5">
                     <span class="text-xs text-slate-400 font-medium">Lợi nhuận dự kiến</span>
-                    <span class="text-sm text-emerald-400 font-bold font-mono">+${formatNumber(card.profit)}</span>
+                    <span class="text-sm text-emerald-400 font-bold font-mono">+${formatNumber(card.profit)}💰</span>
                 </div>
                 
                 <div class="relative z-10">${btnHtml}</div>
@@ -1333,40 +1341,47 @@ window.claimInvestment = async (id, btn) => {
 function renderTasks() {
     const container = document.getElementById('tasks-list');
     if (!container) return;
-    
     container.innerHTML = '';
     
-    // 1. Luôn render Adsgram Task (Vip) ở trên cùng
+    // Render cái Adsgram VIP (Giữ nguyên)
     renderAdsgramTaskBlock('tasks-list');
 
-    // 2. Sắp xếp danh sách Task trước khi vẽ
+    const now = Date.now();
+    const ENERGY_COOLDOWN = 15 * 60 * 1000; // 15 Phút
+
     const sortedTasks = [...TASKS].sort((a, b) => {
-        const isDoneA = state.completedTasks.includes(a.id);
-        const isDoneB = state.completedTasks.includes(b.id);
+        // Hàm check trạng thái hoàn thành
+        const checkDone = (task) => {
+            // 🔥 LOGIC MỚI CHO TASK 0: Check thời gian
+            if (task.type === 'ad_energy') {
+                const lastTime = parseInt(localStorage.getItem('last_energy_ad_ts') || '0');
+                // Nếu chưa qua 15p -> Coi như đã xong (để hiện tích xanh)
+                return (now - lastTime) < ENERGY_COOLDOWN;
+            }
+            // Các task thường: Check trong mảng completedTasks
+            return state.completedTasks.includes(Number(task.id));
+        };
 
-        // ƯU TIÊN 1: Đã làm xong vứt xuống đáy xã hội
-        if (isDoneA !== isDoneB) {
-            return isDoneA ? 1 : -1; // Ai xong (true) thì return 1 (xuống dưới)
-        }
+        const isDoneA = checkDone(a);
+        const isDoneB = checkDone(b);
 
-        // ƯU TIÊN 2: Nếu cùng chưa làm (hoặc cùng đã làm) -> Check loại nhiệm vụ
-        // Invite (Mời bạn) cho xuống dưới
-        // Tele/Partner (Đối tác) cho lên trên
-        const isInviteA = a.type === 'invite'; // Hoặc check a.id >= 5
-        const isInviteB = b.type === 'invite';
-
-        if (isInviteA !== isInviteB) {
-            return isInviteA ? 1 : -1; // Invite (true) thì xuống dưới
-        }
-
-        // ƯU TIÊN 3: Giữ nguyên thứ tự ID (1,2,3...)
+        if (isDoneA !== isDoneB) return isDoneA ? 1 : -1; // Đã xong vứt xuống dưới
         return a.id - b.id;
     });
 
-    // 3. Vẽ vòng lặp như cũ
     sortedTasks.forEach(task => {
-        const isCompleted = state.completedTasks.includes(Number(task.id));
+        // Xác định trạng thái hoàn thành
+        let isCompleted = state.completedTasks.includes(Number(task.id));
         
+        // 🔥 LOGIC RIÊNG TASK 0: CẬP NHẬT REWARD & CHECK COMPLETED
+        if (task.type === 'ad_energy') {
+            const lastTime = parseInt(localStorage.getItem('last_energy_ad_ts') || '0');
+            isCompleted = (now - lastTime) < ENERGY_COOLDOWN;
+            
+            // Cập nhật phần thưởng hiển thị bằng Max Energy hiện tại
+            task.reward = state.baseMaxEnergy || 1000;
+        }
+
         const bgClass = isCompleted 
             ? 'bg-emerald-900/20 border-emerald-800 opacity-60 cursor-default order-last' 
             : 'bg-[#272738] border-[#3d3d52] hover:bg-[#323246] active:scale-[0.98] cursor-pointer';
@@ -1375,6 +1390,12 @@ function renderTasks() {
             ? '<i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500"></i>'
             : '<i data-lucide="chevron-right" class="w-5 h-5 text-gray-500"></i>';
 
+        // Nếu là Task 0 chưa làm -> Hiện icon Play màu vàng
+        const actionIcon = (task.type === 'ad_energy' && !isCompleted)
+            ? '<i data-lucide="play-circle" class="w-6 h-6 text-yellow-400 animate-pulse"></i>'
+            : iconHtml;
+
+        // Nếu đã xong thì không gắn hàm click nữa
         const onClickAction = isCompleted ? '' : `onclick="onClickTask(${task.id})"`;
 
         const html = `
@@ -1386,13 +1407,13 @@ function renderTasks() {
                     <div class="text-left">
                         <div class="font-bold text-sm text-white">${task.name}</div>
                         <div class="flex items-center gap-1 mt-0.5">
-                            <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 font-bold">
+                            <span class="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/20 font-bold flex items-center gap-1">
                                 +${formatNumber(task.reward)}💎
                             </span>
                         </div>
                     </div>
                 </div>
-                ${iconHtml}
+                ${actionIcon}
             </div>
         `;
         container.innerHTML += html;
@@ -1496,29 +1517,126 @@ if (!window.__adsgramTaskListenerAdded) {
 }
 
 window.onClickTask = (id) => {
-    currentSelectedTask = TASKS.find(t => t.id === id);
+    let task = TASKS.find(t => t.id === id);
+    
+    // Cập nhật lại reward mới nhất cho Task 0 (phòng trường hợp vừa nâng cấp bình xăng xong)
+    if (task.type === 'ad_energy') {
+        task.reward = state.baseMaxEnergy || 1000;
+    }
+    
+    currentSelectedTask = task;
+
     const btnCheck = document.getElementById('task-btn-check');
     if (btnCheck) setLoading(btnCheck, false);
+
     document.getElementById('task-name').innerText = currentSelectedTask.name;
     document.getElementById('task-icon').innerText = currentSelectedTask.icon;
-    document.getElementById('task-reward').innerText = `+${formatNumber(currentSelectedTask.reward)}`;
+    
+    // Hiển thị thưởng Kim Cương
+    const rwEl = document.getElementById('task-reward');
+    rwEl.innerHTML = `💎 ${formatNumber(currentSelectedTask.reward)}`;
+    rwEl.className = "text-xl font-black text-indigo-400";
+
     const btnAction = document.getElementById('task-btn-action');
-    if (currentSelectedTask.type === 'invite') {
+    const btnCheckEl = document.getElementById('task-btn-check');
+
+    // 🔥 XỬ LÝ NÚT BẤM CHO TASK QC
+    if (currentSelectedTask.type === 'ad_energy') {
+        btnAction.style.display = 'flex';
+        btnAction.innerHTML = `Xem ngay <i data-lucide="play" class="w-4 h-4 ml-1"></i>`;
+        // Màu vàng cho nổi bật
+        btnAction.className = "w-full py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all";
+        
+        btnCheckEl.style.display = 'none'; // Ẩn nút kiểm tra
+    } 
+    // XỬ LÝ TASK MỜI BẠN
+    else if (currentSelectedTask.type === 'invite') {
         btnAction.style.display = 'none';
-    } else {
+        btnCheckEl.style.display = 'flex';
+    } 
+    // XỬ LÝ TASK THƯỜNG (JOIN GROUP)
+    else {
         btnAction.style.display = 'flex';
         btnAction.innerHTML = `Tham gia ngay <i data-lucide="chevron-right" class="w-4 h-4"></i>`;
+        btnAction.className = "w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-all";
+        btnCheckEl.style.display = 'flex';
     }
+    
     openModal('modal-task');
     lucide.createIcons();
 };
 
-window.doTaskAction = () => {
+window.doTaskAction = async () => {
+    // 🔥 TRƯỜNG HỢP 1: NHIỆM VỤ QUẢNG CÁO (NẠP NĂNG LƯỢNG)
+    if (currentSelectedTask.type === 'ad_energy') {
+        const btn = document.getElementById('task-btn-action');
+        // 1. Chặn click đúp
+        if (!btn || btn.disabled) return;
+        setLoading(btn, true);
+
+        try {
+            // ============================================================
+            // BƯỚC 1: GỌI API CHECK (Xem có được phép xem QC không)
+            // ============================================================
+            const res = await fetch(`${API_BASE}/apply`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ type: 'check_ad' }) // Chỉ check
+            });
+
+            const data = await res.json();
+
+            // 🛑 Nếu Server bảo Lỗi (Bị ban, hết lượt...) -> Dừng ngay
+            if (!res.ok) {
+                throw new Error(data.error || 'Không thể nhận nhiệm vụ lúc này');
+            }
+
+            // ============================================================
+            // BƯỚC 2: API OK -> HIỆN QUẢNG CÁO
+            // ============================================================
+            try {
+                await showEnergyAd(); // Bắt buộc xem hết
+            } catch (qcError) {
+                // Nếu tắt ngang thì thôi, không làm gì cả (tiền chưa cộng nên ko sợ lỗ)
+                showNotification(qcError.message, 'warning');
+                return; 
+            }
+
+            // ============================================================
+            // BƯỚC 3: XỬ LÝ SAU KHI XEM XONG (Webhook đã chạy ngầm)
+            // ============================================================
+            
+            // Lưu thời gian cooldown (15p)
+            localStorage.setItem('last_energy_ad_ts', Date.now());
+
+            showNotification(`Nhiệm vụ hoàn thành!`, 'success');
+
+            // Đóng modal ngay cho mượt
+            closeModal('modal-task');
+            
+            // Vẽ lại danh sách (Task sẽ tích xanh và ẩn xuống dưới)
+            renderTasks();
+
+            // ⏳ Chờ 2-3 giây để Webhook của Adgram kịp cộng tiền vào DB
+            // Sau đó gọi loadUserInfo để cập nhật số KC mới lên màn hình
+            setTimeout(async () => {
+                await loadUserInfo({ silent: true });
+                updateUI(); 
+            }, 3000);
+
+        } catch (e) {
+            showNotification(e.message || 'Lỗi hệ thống', 'error');
+        } finally {
+            setLoading(btn, false);
+        }
+        return;
+    }
+
+    // 🔥 TRƯỜNG HỢP 2: NHIỆM VỤ THƯỜNG
     if(currentSelectedTask.link && currentSelectedTask.link !== '#') {
         window.open(currentSelectedTask.link, '_blank');
     }
 };
-
 window.checkTaskAction = async () => {
     const btn = document.getElementById('task-btn-check');
     if (!btn || btn.disabled) return;
