@@ -132,7 +132,7 @@ export default async function handler(req, res) {
         const socialRef = db.collection('user_social').doc(uid);
         batch.set(socialRef, {
             invite_count: 0,
-            total_invite_earned: 0,
+            total_invite_diamond: 0,
             completed_tasks: [],
             withdrawHistory: [],
             daily_streak: 0,
