@@ -12,7 +12,7 @@ if (!getApps().length) {
     initializeApp({
         credential: cert(serviceAccount),
         // Trỏ đúng vào server Singapore
-        databaseURL: "https://dvmxh-like-default-rtdb.asia-southeast1.firebasedatabase.app"
+        databaseURL: "https://typhubautroi-db-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
 }
 
