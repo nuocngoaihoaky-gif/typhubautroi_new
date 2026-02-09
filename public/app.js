@@ -3,10 +3,10 @@
 // =============================================================================
 
 // 💰 CẤU HÌNH QUẢNG CÁO
-const ID_ENERGY_AD = "2291";      // Loại Reward (Bắt buộc xem hết)
-const ID_FLY_AD    = "int-2308";  // Loại Interstitial (Có thể tắt)
-const ID_TASK_AD   = "task-2327";
-const ID_DAILY_AD  = "2240";
+const ID_ENERGY_AD = "22291";      // Loại Reward (Bắt buộc xem hết)
+const ID_FLY_AD    = "int-22308";  // Loại Interstitial (Có thể tắt)
+const ID_TASK_AD   = "task-22327";
+const ID_DAILY_AD    = "22440";
 
 // 🏦 DANH SÁCH NGÂN HÀNG
 const BANK_FULL_NAMES = {
@@ -633,7 +633,7 @@ async function startFlight() {
     lucide.createIcons();
     try {
         // Code sẽ dừng ở đây chờ user xem xong video
-        //await showFlyAd(); 
+        await showFlyAd(); 
     } catch (e) {
         // Nếu user tắt ngang -> Báo lỗi và KHÔNG cho bay
         showNotification(e.message, 'error');
