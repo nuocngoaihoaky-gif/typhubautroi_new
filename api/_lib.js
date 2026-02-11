@@ -4,21 +4,46 @@ import { getDatabase } from 'firebase-admin/database';
 import crypto from 'crypto';
 
 // ============================================================
-// 1. KẾT NỐI FIREBASE (Singleton - Chỉ chạy 1 lần)
+// 1. KẾT NỐI FIREBASE (MULTI-APP SETUP)
 // ============================================================
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-if (!getApps().length) {
-    initializeApp({
-        credential: cert(serviceAccount),
-        // Trỏ đúng vào server Singapore
-        databaseURL: "https://dvmxh-like-default-rtdb.asia-southeast1.firebasedatabase.app/"
+// A. Cấu hình cho FIRESTORE (Lưu Giftcode, Profile) - Dùng App Mặc Định
+const serviceAccountFirestore = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+// B. Cấu hình cho REALTIME DB (Lưu Tiền, Energy) - Dùng App Phụ
+const serviceAccountRTDB = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_RTDB);
+
+let firestoreApp;
+let rtdbApp;
+
+// --- Khởi tạo App 1: FIRESTORE (Default App) ---
+if (getApps().length === 0) {
+    firestoreApp = initializeApp({
+        credential: cert(serviceAccountFirestore)
+        // Firestore không cần databaseURL, nó tự nhận theo project ID
     });
+} else {
+    firestoreApp = getApp(); // Lấy app mặc định
 }
 
-const app = getApp();
-const db = getFirestore(app);   // Firestore (Lưu Profile, Lịch sử)
-const rtdb = getDatabase(app);  // Realtime DB (Lưu Vàng, Energy)
+// --- Khởi tạo App 2: REALTIME DB (Named App) ---
+const RTDB_APP_NAME = 'RTDB_WORKER'; // Đặt tên riêng để không bị trùng
+const existingApps = getApps();
+const foundRtdbApp = existingApps.find(app => app.name === RTDB_APP_NAME);
+
+if (!foundRtdbApp) {
+    rtdbApp = initializeApp({
+        credential: cert(serviceAccountRTDB),
+        // 🔥 URL này phải khớp với project chứa Realtime DB
+        databaseURL: "https://typhubautroi-db-default-rtdb.asia-southeast1.firebasedatabase.app" 
+    }, RTDB_APP_NAME);
+} else {
+    rtdbApp = getApp(RTDB_APP_NAME);
+}
+
+// Xuất ra 2 instance DB từ 2 App khác nhau
+const db = getFirestore(firestoreApp);  // Kết nối Firestore của Project 1
+const rtdb = getDatabase(rtdbApp);      // Kết nối RTDB của Project 2
 
 // ============================================================
 // 2. BẢO MẬT TELEGRAM (Verify InitData)
