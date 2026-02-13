@@ -1,10 +1,10 @@
 import { db, rtdb } from './_lib'; // db = Firestore, rtdb = Realtime DB
 
 // ================= CẤU HÌNH =================
-const REWARDS = [0, 0, 0]; // Vàng: Top 1, 2, 3
+const REWARDS = [1, 1, 1]; // Vàng: Top 1, 2, 3
 const TITLES = ["Top 1 BXH", "Top 2 BXH", "Top 3 BXH"];
 
-// 🔥 DÙNG FILE_ID THAY CHO LINK ẢNH (Load siêu nhanh, không lỗi)
+// 🔥 DÙNG FILE_ID (Load siêu nhanh, không lỗi vùng)
 const RANK_IMAGES = [
     "AgACAgUAAxkBAAFCXtxpj3t0NYtt5HwMySrcgdKf-wg5aAACmg1rG_vRgVR0B6jeMM-jwwEAAwIAA20AAzoE", // Top 1
     "AgACAgUAAxkBAAFCXuxpj33jQ1AZjzYrbtGEJJOPhKgj2QACmw1rG_vRgVT07GL2aJ6cUgEAAwIAA3kAAzoE", // Top 2
@@ -14,7 +14,7 @@ const RANK_IMAGES = [
 // Cấu hình Giftcode Top 1
 const TOP1_GIFTCODE = {
     amount: 500,       // 500 Kim cương
-    type: 'diamond',   // Loại tiền
+    type: 'diamond',   // Loại tiền (diamond/balance/energy)
     limit: 5,          // 5 lượt nhập
     days: 1            // Hết hạn sau 1 ngày
 };
@@ -59,10 +59,10 @@ export default async function handler(req, res) {
         const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const displayDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-        // 🔥 BXH nằm ở Realtime DB
+        // 🔥 Lấy BXH từ Realtime DB (Nhớ set Rules .indexOn score để không lỗi)
         const lbRef = rtdb.ref(`daily_leaderboard/${dateKey}`);
         
-        // 3. Lấy Top 3 từ Realtime DB
+        // 3. Lấy Top 3
         const snapshot = await lbRef.orderByChild('score').limitToLast(3).once('value');
         
         // Nếu không có dữ liệu (hoặc đã bị xóa do chạy rồi) -> Dừng
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 
         const winners = [];
         snapshot.forEach((child) => {
-            if (child.key === 'is_rewarded') return; // Bỏ qua node flag cũ nếu còn sót
+            if (child.key === 'is_rewarded') return;
             winners.push({ id: child.key, ...child.val() });
         });
         winners.reverse(); // Đảo ngược để Top 1 lên đầu
@@ -125,21 +125,24 @@ export default async function handler(req, res) {
                 const code = generateCode();
                 
                 // Tính hạn sử dụng (ms timestamp)
-                const expiryDate = Date.now() + (TOP1_GIFTCODE.hours * 60 * 60 * 1000);
+                const expiryDate = Date.now() + (TOP1_GIFTCODE.days * 24 * 60 * 60 * 1000);
                 
-                // 🔥 DATA CHUẨN (Khớp với api/giftcode.js)
+                // 🔥 DATA CHUẨN FIRESTORE (Khớp api/giftcode.js)
                 const giftData = {
                     rewardAmount: TOP1_GIFTCODE.amount,
                     rewardType: TOP1_GIFTCODE.type,
                     usageLimit: TOP1_GIFTCODE.limit,
+                    
+                    // Các trường bắt buộc để logic check hoạt động:
                     usageCount: 0,
                     expiryDate: expiryDate,
                     usedBy: [],
+                    
                     createdAt: Date.now(),
                     note: `Quà Top 1 ngày ${displayDate} cho ${user.name}`
                 };
 
-                // Lưu vào Firestore
+                // Lưu vào Firestore (db)
                 tasks.push(db.collection('giftcodes').doc(code).set(giftData));
 
                 giftcodeInfo = code; // Lưu mã để tí báo cáo Admin
@@ -152,10 +155,10 @@ export default async function handler(req, res) {
 
             msg += `\n<i>Tiền đã về ví. Giữ vững phong độ nhé! ✈️</i>`;
 
-            // 4. Gửi ảnh vinh danh bằng FILE_ID
+            // 4. Gửi ảnh vinh danh (Dùng File ID)
             tasks.push(callTelegram('sendPhoto', {
                 chat_id: uid,
-                photo: RANK_IMAGES[index], // Sử dụng file_id
+                photo: RANK_IMAGES[index],
                 caption: msg,
                 parse_mode: 'HTML'
             }));
@@ -187,9 +190,8 @@ export default async function handler(req, res) {
         await Promise.all(tasks);
 
         // =========================================================
-        // 🔥 QUAN TRỌNG: XÓA NODE NGÀY CŨ ĐỂ KHÔNG PHÌNH DATA
+        // 🔥 XÓA NHÁNH CŨ ĐỂ KHÔNG PHÌNH DATA (RTDB)
         // =========================================================
-        // Lệnh này sẽ xóa toàn bộ nhánh daily_leaderboard/202X-XX-XX
         await lbRef.remove();
 
         // --- D. BÁO CÁO ADMIN ---
