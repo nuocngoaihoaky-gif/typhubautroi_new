@@ -20,7 +20,7 @@ export default async function handler(req, res) {
         
         // Lấy Name & Avatar chuẩn từ Telegram ngay lúc này
         const myFullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ').trim();
-        const myAvatar = tgUser.photo_url || "https://i.imgur.com/lD9PfO7.png";
+        const myAvatar = tgUser.photo_url || "https://i.imgur.com/AvcWXfL.png";
 
         // 3. Xác định ngày hiện tại (Theo giờ VN)
         const date = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
             rank: index + 1,
             name: u.name || "Phi Công Bí Ẩn", // Tên lưu trong DB
             score: u.score,
-            avatar: u.avatar || "https://i.imgur.com/lD9PfO7.png"      // Avatar lưu trong DB
+            avatar: u.avatar || "https://i.imgur.com/AvcWXfL.png"      // Avatar lưu trong DB
         }));
 
         // 6. Xử lý thông tin Hạng của "Me"
