@@ -1,21 +1,25 @@
 import { db, rtdb } from './_lib'; // db = Firestore, rtdb = Realtime DB
 
 // ================= CẤU HÌNH =================
-const REWARDS = [150000, 100000, 50000]; // Vàng: Top 1, 2, 3
+const REWARDS = [0, 0, 0]; // Vàng: Top 1, 2, 3
 const TITLES = ["Top 1 BXH", "Top 2 BXH", "Top 3 BXH"];
+
+// 🔥 DÙNG FILE_ID THAY CHO LINK ẢNH (Load siêu nhanh, không lỗi)
 const RANK_IMAGES = [
-    "https://i.imgur.com/zuh0eTS.png", // Top 1
-    "https://i.imgur.com/j1MXTdk.png", // Top 2
-    "https://i.imgur.com/Rzf9PRO.png"  // Top 3
+    "AgACAgUAAxkBAAFCXtxpj3t0NYtt5HwMySrcgdKf-wg5aAACmg1rG_vRgVR0B6jeMM-jwwEAAwIAA20AAzoE", // Top 1
+    "AgACAgUAAxkBAAFCXuxpj33jQ1AZjzYrbtGEJJOPhKgj2QACmw1rG_vRgVT07GL2aJ6cUgEAAwIAA3kAAzoE", // Top 2
+    "AgACAgUAAxkBAAFCXvJpj34IN9_CMf6bvBuevUeCVkzmHwACnA1rG_vRgVQKAAFA7AyrJtgBAAMCAAN5AAM6BA"  // Top 3
 ];
 
 // Cấu hình Giftcode Top 1
 const TOP1_GIFTCODE = {
-    reward: 500,   // 500 Kim Cương
-    usage: 5,      // 5 lượt nhập
-    hours: 24      // Hết hạn sau 24h
+    amount: 500,       // 500 Kim cương
+    type: 'diamond',   // Loại tiền
+    limit: 5,          // 5 lượt nhập
+    days: 1            // Hết hạn sau 1 ngày
 };
 
+// 🔥 ID Cứng
 const CHAT_ID = '-1003866604957'; 
 const ADMIN_ID = '8065435277'; 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -29,17 +33,14 @@ const callTelegram = (method, body) => {
     }).catch(err => console.error(`Tele API Error (${method}):`, err.message));
 };
 
-// Helper: Sinh mã Giftcode 12 ký tự (A-Z, 0-9), KHÔNG ký tự đặc biệt
+// Helper: Sinh mã Giftcode 12 ký tự (A-Z, 0-9)
 const generateCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
-    // Prefix "TOP1" (4 ký tự) + 8 ký tự ngẫu nhiên = 12 ký tự
-    // Hoặc random full 12 ký tự. Ở đây mình làm random full 12 cho khó đoán hẳn.
-    // Nếu thích có chữ TOP1 thì sửa vòng lặp i < 8 và result = 'TOP1' + ...
     for (let i = 0; i < 12; i++) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return result; // Ví dụ: A1B2C3D4E5F6
+    return result; 
 };
 
 const fmt = (n) => new Intl.NumberFormat('en-US').format(n);
@@ -61,28 +62,28 @@ export default async function handler(req, res) {
         // 🔥 BXH nằm ở Realtime DB
         const lbRef = rtdb.ref(`daily_leaderboard/${dateKey}`);
         
-        // Check đã trả chưa
-        const statusSnap = await lbRef.child('is_rewarded').once('value');
-        if (statusSnap.val() === true) return res.status(200).json({ message: 'Đã trả rồi!' });
-
         // 3. Lấy Top 3 từ Realtime DB
         const snapshot = await lbRef.orderByChild('score').limitToLast(3).once('value');
-        if (!snapshot.exists()) return res.status(200).json({ message: 'Không có dữ liệu' });
+        
+        // Nếu không có dữ liệu (hoặc đã bị xóa do chạy rồi) -> Dừng
+        if (!snapshot.exists()) {
+            return res.status(200).json({ message: 'Không có dữ liệu hoặc đã trả thưởng xong.' });
+        }
 
         const winners = [];
         snapshot.forEach((child) => {
-            if (child.key === 'is_rewarded') return;
+            if (child.key === 'is_rewarded') return; // Bỏ qua node flag cũ nếu còn sót
             winners.push({ id: child.key, ...child.val() });
         });
-        winners.reverse(); 
+        winners.reverse(); // Đảo ngược để Top 1 lên đầu
 
         // =========================================================
-        // 🔥 XỬ LÝ SONG SONG
+        // 🔥 XỬ LÝ SONG SONG (Tốc độ cao)
         // =========================================================
         const tasks = []; 
         let giftcodeInfo = null;
 
-        // --- A. DUYỆT NGƯỜI CHIẾN THẮNG ---
+        // --- A. TRẢ THƯỞNG & GỬI TIN NHẮN ---
         winners.forEach((user, index) => {
             const uid = user.id;
             const rewardGold = REWARDS[index];
@@ -98,70 +99,75 @@ export default async function handler(req, res) {
             });
             tasks.push(pWallet);
 
-            // 2. Set Admin Telegram
+            // 2. Set Admin & Title Group
             if (CHAT_ID) {
-                // Set Admin (Quyền ảo)
+                // Promote (Admin ảo - Không quyền)
                 tasks.push(callTelegram('promoteChatMember', {
                     chat_id: CHAT_ID, user_id: uid, is_anonymous: false,
                     can_manage_chat: false, can_post_messages: false, can_edit_messages: false,
                     can_delete_messages: false, can_manage_video_chats: false, can_restrict_members: false,
                     can_promote_members: false, can_change_info: false, can_invite_users: false, can_pin_messages: false
                 }));
-                // Set Title
+                // Set Title (Danh hiệu)
                 tasks.push(callTelegram('setChatAdministratorCustomTitle', {
                     chat_id: CHAT_ID, user_id: uid, custom_title: title
                 }));
             }
 
-            // 3. Soạn tin nhắn
+            // 3. Soạn nội dung tin nhắn riêng
             let msg = `<b>🎉 CHÚC MỪNG CHIẾN THẮNG 🎉</b>\n\n` +
                       `Bạn đạt <b>TOP ${rank}</b> ngày <b>${displayDate}</b>!\n` +
-                      `💰 Thưởng: <b>+${fmt(rewardGold)}💰</b>\n` +
+                      `💰 Thưởng: <b>+${fmt(rewardGold)} Vàng</b>\n` +
                       `🏆 Danh hiệu: <b>${title}</b>\n`;
 
-            // 🔥 TOP 1: TẠO GIFTCODE (LƯU VÀO FIRESTORE)
+            // 🔥 QUÀ ĐẶC BIỆT CHO TOP 1: GIFTCODE (FIRESTORE)
             if (index === 0) {
-                const code = generateCode(); // 12 ký tự, ko đặc biệt
-                const expireTime = Date.now() + (TOP1_GIFTCODE.hours * 60 * 60 * 1000);
+                const code = generateCode();
                 
-                // 🔥 Lưu vào Firestore (db) chứ không phải rtdb
-                const pCode = db.collection('giftcodes').doc(code).set({
-                    reward: TOP1_GIFTCODE.reward, // 500 Kim cương
-                    type: 'diamond',
-                    usages: TOP1_GIFTCODE.usage,  // 5 lượt
-                    expires_at: expireTime,
-                    created_at: Date.now(),
-                    created_for: uid,
-                    desc: `Quà Top 1 ngày ${displayDate}`
-                });
-                tasks.push(pCode);
+                // Tính hạn sử dụng (ms timestamp)
+                const expiryDate = Date.now() + (TOP1_GIFTCODE.hours * 60 * 60 * 1000);
+                
+                // 🔥 DATA CHUẨN (Khớp với api/giftcode.js)
+                const giftData = {
+                    rewardAmount: TOP1_GIFTCODE.amount,
+                    rewardType: TOP1_GIFTCODE.type,
+                    usageLimit: TOP1_GIFTCODE.limit,
+                    usageCount: 0,
+                    expiryDate: expiryDate,
+                    usedBy: [],
+                    createdAt: Date.now(),
+                    note: `Quà Top 1 ngày ${displayDate} cho ${user.name}`
+                };
 
-                giftcodeInfo = code; // Để báo cáo Admin
+                // Lưu vào Firestore
+                tasks.push(db.collection('giftcodes').doc(code).set(giftData));
+
+                giftcodeInfo = code; // Lưu mã để tí báo cáo Admin
 
                 msg += `\n<b>🎁 QUÀ ĐỘC QUYỀN TOP 1:</b>\n` +
                        `Code: <code>${code}</code>\n` +
-                       `(500💎 x 5 lượt - HSD 24h)\n` +
-                       `<i>👉 Share code này vào nhóm chat để  vui nhé!</i>`;
+                       `(${fmt(TOP1_GIFTCODE.amount)}💎 x ${TOP1_GIFTCODE.limit} lượt)\n` +
+                       `<i>👉 Share code này vào nhóm để chia vui nhé!</i>`;
             }
 
             msg += `\n<i>Tiền đã về ví. Giữ vững phong độ nhé! ✈️</i>`;
 
-            // 4. Gửi ảnh (Tin nhắn riêng)
+            // 4. Gửi ảnh vinh danh bằng FILE_ID
             tasks.push(callTelegram('sendPhoto', {
                 chat_id: uid,
-                photo: RANK_IMAGES[index],
+                photo: RANK_IMAGES[index], // Sử dụng file_id
                 caption: msg,
                 parse_mode: 'HTML'
             }));
         });
 
-        // --- B. XÓA ADMIN CŨ (Realtime DB) ---
+        // --- B. DỌN DẸP ADMIN CŨ (Realtime DB) ---
         if (CHAT_ID) {
             const oldAdminsSnap = await rtdb.ref('system/current_top_admins').once('value');
             const oldAdmins = oldAdminsSnap.val() || [];
             
             oldAdmins.forEach(uid => {
-                // Nếu người cũ ko nằm trong Top 3 mới -> Demote
+                // Nếu người cũ KHÔNG nằm trong Top 3 mới -> Xóa quyền (Demote)
                 if (!winners.find(w => w.id === uid)) {
                     tasks.push(callTelegram('promoteChatMember', {
                         chat_id: CHAT_ID, user_id: uid,
@@ -172,16 +178,19 @@ export default async function handler(req, res) {
                 }
             });
 
-            // Lưu danh sách Admin mới vào Realtime DB
+            // Cập nhật danh sách Admin mới
             const newAdminIds = winners.map(w => w.id);
             tasks.push(rtdb.ref('system/current_top_admins').set(newAdminIds));
         }
 
-        // --- C. THỰC THI TẤT CẢ ---
+        // --- C. CHẠY TẤT CẢ (Promise.all) ---
         await Promise.all(tasks);
 
-        // Đánh dấu đã trả thưởng (Realtime DB)
-        await lbRef.update({ is_rewarded: true });
+        // =========================================================
+        // 🔥 QUAN TRỌNG: XÓA NODE NGÀY CŨ ĐỂ KHÔNG PHÌNH DATA
+        // =========================================================
+        // Lệnh này sẽ xóa toàn bộ nhánh daily_leaderboard/202X-XX-XX
+        await lbRef.remove();
 
         // --- D. BÁO CÁO ADMIN ---
         if (ADMIN_ID) {
@@ -201,7 +210,7 @@ export default async function handler(req, res) {
             });
         }
 
-        return res.status(200).json({ success: true, tasks: tasks.length });
+        return res.status(200).json({ success: true, count: tasks.length });
 
     } catch (e) {
         console.error("Cron Error:", e);
