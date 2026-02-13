@@ -2,7 +2,7 @@ import { db, rtdb } from './_lib'; // db = Firestore, rtdb = Realtime DB
 
 // ================= CẤU HÌNH =================
 const REWARDS = [150000, 100000, 50000]; // Vàng: Top 1, 2, 3
-const TITLES = ["🏆 Top 1 BXH", "🥈 Top 2 BXH", "🥉 Top 3 BXH"];
+const TITLES = ["Top 1 BXH", "Top 2 BXH", "Top 3 BXH"];
 const RANK_IMAGES = [
     "AgACAgUAAxkBAAFCXtxpj3t0NYtt5HwMySrcgdKf-wg5aAACmg1rG_vRgVR0B6jeMM-jwwEAAwIAA20AAzoE", // Top 1
     "AgACAgUAAxkBAAFCXuxpj33jQ1AZjzYrbtGEJJOPhKgj2QACmw1rG_vRgVT07GL2aJ6cUgEAAwIAA3kAAzoE", // Top 2
