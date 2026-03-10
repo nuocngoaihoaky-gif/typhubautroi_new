@@ -1,32 +1,21 @@
 name: TON_Payment_Worker
 
 on:
-  schedule:
-    # Chạy mỗi 5 tiếng 1 lần (Ví dụ: 0h, 5h, 10h, 15h...)
-    - cron: '0 */5 * * *'
-  workflow_dispatch: # Bấm nút chạy bằng tay
+  workflow_dispatch: # Chỉ nhận lệnh chạy thủ công hoặc từ API bên ngoài
 
-# TÍNH NĂNG TỰ ĐỘNG GIẾT PROCESS CŨ (THAY THẾ SCRIPT CỦA SẾP)
 concurrency:
   group: ton-scanner-group
-  cancel-in-progress: true # Tự động hủy phiên bản cũ đang chạy khi phiên bản mới bắt đầu
+  cancel-in-progress: true # Cronjob gõ cửa -> Thằng mới chạy -> Thằng cũ bị chém ngay lập tức
 
 jobs:
   run-worker:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Install Dependencies
-        run: pip install requests firebase-admin
-
+      - run: pip install requests firebase-admin
       - name: Run Python Worker
         env:
           ADMIN_WALLET: ${{ secrets.ADMIN_WALLET }}
@@ -34,11 +23,5 @@ jobs:
           ADMIN_TELEGRAM_ID: ${{ secrets.ADMIN_TELEGRAM_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        
-        # Cài giới hạn 310 phút (~ 5 tiếng 10 phút). 
-        # Action sẽ tự chết trước khi Github chém đầu nó ở phút 360, 
-        # sau đó 50 phút sau Cronjob vòng lặp mới sẽ tự động gọi lại.
-        timeout-minutes: 340 
-        
-        # Thêm cờ "-u" (unbuffered) để log in ra ngay lập tức trên màn hình Github Actions
-        run: python -u bot_ton_scanner.py
+        timeout-minutes: 310
+        run: python -u tonview.py
